@@ -1,0 +1,7 @@
+<h1>Editing {{.Item}}</h1>
+
+<form action="/save/{{.Item}}" method="POST">
+    <div><input type="text" id="field1" name="filed1" value="{{.Field1}}"></div>
+    <div><input type="text" id="field2" name="filed2" value="{{.Field2}}"></div>
+    <div><input type="submit" value="Save"></div>
+</form>
