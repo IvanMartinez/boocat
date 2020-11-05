@@ -13,12 +13,14 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/ivanmartinez/wikiforms"
+	"github.com/ivanmartinez/strwiki"
+	"github.com/ivanmartinez/strwiki/database"
 )
 
 func main() {
 	// Parse flags
 	port := flag.String("p", "9090", "Listening port")
+	dbURI := flag.String("dburi", "mongodb://127.0.0.1:27017", "Database URI")
 	flag.Parse()
 
 	// Create channel for listening to OS signals and connect OS interrupts to
@@ -32,6 +34,10 @@ func main() {
 		cancel()
 	}()
 
+	// Open the database
+	db := database.Connect(ctx, dbURI)
+	defer db.Disconnect(ctx)
+
 	// Start this server
-	wikiforms.StartServer(ctx, *port)
+	strwiki.StartServer(ctx, *port)
 }

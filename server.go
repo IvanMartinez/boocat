@@ -1,16 +1,16 @@
-package wikiforms
+package strwiki
 
 import (
 	"context"
 	"fmt"
 	"log"
 	"net/http"
-	"regexp"
+	"net/url"
 	"time"
 
 	"github.com/gorilla/mux"
 
-	"github.com/ivanmartinez/wikiforms/templates"
+	"github.com/ivanmartinez/strwiki/templates"
 )
 
 // StartServer starts this HTTP server
@@ -20,10 +20,9 @@ func StartServer(ctx context.Context, port string) {
 	// Gorilla mux router allows us to use patterns in paths
 	router := mux.NewRouter()
 	// Register handle functions
-	router.HandleFunc("/view/{page}", viewHandler)
 	router.HandleFunc("/test", testHandler)
-	router.HandleFunc("/edit/{item}", makeHandler(editHandler))
-	router.HandleFunc("/save/", makeHandler(saveHandler))
+	router.HandleFunc("/edit/{item}", editHandler)
+	router.HandleFunc("/save/{item}", saveHandler)
 
 	// Start the HTTP server in a new goroutine
 	srv := &http.Server{
@@ -71,15 +70,43 @@ func loadPage(title string) (*FormData, error) {
 	return &FormData{Item: title, Field1: ""}, nil
 }
 
-func editHandler(w http.ResponseWriter, r *http.Request, item string) {
-	fmt.Printf("editHandler\n")
-	p, err := loadPage(item)
-	if err != nil {
-		p = &FormData{Item: item}
+func editHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	item, found := vars["item"]
+
+	if !found {
+		http.NotFound(w, r)
+		return
 	}
-	renderTemplate(w, "edit", p)
+
+	template, found := templates.Get("edit")
+	if !found {
+		http.NotFound(w, r)
+		return
+	}
+
+	err := template.Execute(w, FormData{Item: item, Field1: "f1", Field2: "f2"})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
+func saveHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	item, found := vars["item"]
+
+	if !found {
+		http.NotFound(w, r)
+		return
+	}
+
+	fmt.Printf("Form %v\n", r.Form)
+	r.ParseForm()
+	fmt.Printf("PostForm %v\n", formToMap(r.PostForm))
+	fmt.Printf("Save item %v field1 %v field2 %v\n", item, r.FormValue("field1"), r.FormValue("field2"))
+}
+
+/*
 func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
 	body := r.FormValue("body")
 	p := &FormData{Item: title, Field1: body}
@@ -89,30 +116,7 @@ func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
 		return
 	}
 	http.Redirect(w, r, "/view/"+title, http.StatusFound)
-}
-
-//var templates = template.Must(template.ParseFiles("html/edit.html", "html/view.html"))
-
-func renderTemplate(w http.ResponseWriter, tmpl string, p *FormData) {
-	/*
-		err := templates.ExecuteTemplate(w, tmpl+".html", p)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}*/
-}
-
-var validPath = regexp.MustCompile("^/(edit|save|view)/([a-zA-Z0-9]+)$")
-
-func makeHandler(fn func(http.ResponseWriter, *http.Request, string)) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		m := validPath.FindStringSubmatch(r.URL.Path)
-		if m == nil {
-			http.NotFound(w, r)
-			return
-		}
-		fn(w, r, m[2])
-	}
-}
+}*/
 
 func viewHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
@@ -132,11 +136,18 @@ func viewHandler(w http.ResponseWriter, r *http.Request) {
 
 	err := template.Execute(w, FormData{Item: "I", Field1: "f1", Field2: "f2"})
 	if err != nil {
-
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func testHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Test ok"))
+}
+
+func formToMap(values url.Values) map[string]interface{} {
+	resp := make(map[string]interface{})
+	for key := range values {
+		resp[key] = values.Get(key)
+	}
+	return resp
 }
