@@ -10,6 +10,7 @@ import (
 
 	"github.com/gorilla/mux"
 
+	"github.com/ivanmartinez/strwiki/database"
 	"github.com/ivanmartinez/strwiki/templates"
 )
 
@@ -23,6 +24,7 @@ func StartServer(ctx context.Context, port string) {
 	router.HandleFunc("/test", testHandler)
 	router.HandleFunc("/edit/{item}", editHandler)
 	router.HandleFunc("/save/{item}", saveHandler)
+	router.HandleFunc("/list", listHandler)
 
 	// Start the HTTP server in a new goroutine
 	srv := &http.Server{
@@ -47,12 +49,6 @@ func StartServer(ctx context.Context, port string) {
 	if err := srv.Shutdown(ctxShutDown); err != nil {
 		log.Fatalf("server shutdown failed: %v", err)
 	}
-}
-
-type FormData struct {
-	Item   string
-	Field1 string
-	Field2 string
 }
 
 func (p *FormData) save() error {
@@ -102,8 +98,25 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("Form %v\n", r.Form)
 	r.ParseForm()
+	record := formToMap(r.PostForm)
+	database.Add(record)
 	fmt.Printf("PostForm %v\n", formToMap(r.PostForm))
 	fmt.Printf("Save item %v field1 %v field2 %v\n", item, r.FormValue("field1"), r.FormValue("field2"))
+}
+
+func listHandler(w http.ResponseWriter, r *http.Request) {
+	template, found := templates.Get("list")
+	if !found {
+		http.NotFound(w, r)
+		return
+	}
+
+	records := database.GetAll()
+
+	err := template.Execute(w, records)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 /*
@@ -144,8 +157,8 @@ func testHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Test ok"))
 }
 
-func formToMap(values url.Values) map[string]interface{} {
-	resp := make(map[string]interface{})
+func formToMap(values url.Values) map[string]string {
+	resp := make(map[string]string)
 	for key := range values {
 		resp[key] = values.Get(key)
 	}

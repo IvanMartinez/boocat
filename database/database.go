@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -14,9 +15,10 @@ const (
 	colName = "col"
 )
 
-type Post struct {
-	Title string `json:”title,omitempty”`
-	Body  string `json:”body,omitempty”`
+//@TODO: This may not belong to database
+type Record struct {
+	DbID   string
+	Fields map[string]string
 }
 
 // Context, database and prepared statements
@@ -43,10 +45,9 @@ func Connect(ctx context.Context, dbURI *string) *mongo.Client {
 	return cli
 }
 
-func InsertPost(title string, body string) {
-	post := Post{title, body}
-	collection := cli.Database("my_database").Collection("posts")
-	insertResult, err := collection.InsertOne(context.TODO(), post)
+func Add(record map[string]string) {
+	//@TODO: record should be marshalled
+	insertResult, err := col.InsertOne(context.TODO(), record)
 
 	if err != nil {
 		log.Fatal(err)
@@ -55,17 +56,35 @@ func InsertPost(title string, body string) {
 	fmt.Println("Inserted post with ID:", insertResult.InsertedID)
 }
 
-/*
-func GetPost(id bson.ObjectId) {
-	collection := cli.Database("my_database").Collection("posts")
-	filter := bson.D
-	var post Post
-
-	err := collection.FindOne(context.TODO(), filter).Decode(&post)
-
+func GetAll() []Record {
+	cursor, err := col.Find(context.TODO(), bson.M{})
 	if err != nil {
 		log.Fatal(err)
 	}
+	var documents []map[string]string
+	if err = cursor.All(context.TODO(), &documents); err != nil {
+		log.Fatal(err)
+	}
+	records := documentsToRecords(documents)
+	return records
+}
 
-	fmt.Println("Found post with title ", post.Title)
-}*/
+func documentsToRecords(maps []map[string]string) (records []Record) {
+	records = make([]Record, 0, len(maps))
+	for _, m := range maps {
+		records = append(records, documentToRecord(m))
+	}
+	return records
+}
+
+func documentToRecord(m map[string]string) (record Record) {
+	record.Fields = make(map[string]string)
+	for key, value := range m {
+		if key == "_id" {
+			record.DbID = value
+		} else {
+			record.Fields[key] = value
+		}
+	}
+	return record
+}
