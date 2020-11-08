@@ -3,6 +3,7 @@ package strwiki
 import (
 	"context"
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 	"net/url"
@@ -14,21 +15,24 @@ import (
 	"github.com/ivanmartinez/strwiki/templates"
 )
 
+var httpURL string
+
 // StartServer starts this HTTP server
-func StartServer(ctx context.Context, port string) {
+func StartServer(ctx context.Context, url string) {
+	httpURL = "http://" + url
 	templates.LoadAll()
 
 	// Gorilla mux router allows us to use patterns in paths
 	router := mux.NewRouter()
 	// Register handle functions
 	router.HandleFunc("/test", testHandler)
-	router.HandleFunc("/edit/{item}", editHandler)
-	router.HandleFunc("/save/{item}", saveHandler)
+	router.HandleFunc("/edit/{id}", editHandler)
+	router.HandleFunc("/save/{id}", saveHandler)
 	router.HandleFunc("/list", listHandler)
 
 	// Start the HTTP server in a new goroutine
 	srv := &http.Server{
-		Addr:    ":" + port,
+		Addr:    url,
 		Handler: router,
 	}
 	go func() {
@@ -51,37 +55,30 @@ func StartServer(ctx context.Context, port string) {
 	}
 }
 
-func (p *FormData) save() error {
-	//filename := p.Item + ".txt"
-	return nil
-}
-
-func loadPage(title string) (*FormData, error) {
-	/*
-		filename := title + ".txt"
-			body, err := ioutil.ReadFile(filename)
-			if err != nil {
-				return nil, err
-			}*/
-	return &FormData{Item: title, Field1: ""}, nil
-}
-
 func editHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	item, found := vars["item"]
+	id, found := vars["id"]
 
+	type templateData struct {
+		SaveURL template.URL
+		Fields  map[string]string
+	}
+
+	record := database.Get(id)
+	fmt.Printf("record %v\n", record)
+
+	tData := templateData{
+		SaveURL: template.URL(httpURL + "/edit/" + record.DbID),
+		Fields:  record.Fields,
+	}
+
+	tpl, found := templates.Get("edit")
 	if !found {
 		http.NotFound(w, r)
 		return
 	}
 
-	template, found := templates.Get("edit")
-	if !found {
-		http.NotFound(w, r)
-		return
-	}
-
-	err := template.Execute(w, FormData{Item: item, Field1: "f1", Field2: "f2"})
+	err := tpl.Execute(w, tData)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -105,31 +102,28 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func listHandler(w http.ResponseWriter, r *http.Request) {
-	template, found := templates.Get("list")
+	tpl, found := templates.Get("list")
 	if !found {
 		http.NotFound(w, r)
 		return
 	}
 
-	records := database.GetAll()
+	type templateData struct {
+		EditURL template.URL
+		Records []database.Record
+	}
+	tData := templateData{
+		EditURL: template.URL(httpURL + "/edit/"),
+		Records: database.GetAll(),
+	}
 
-	err := template.Execute(w, records)
+	//records := database.GetAll()
+
+	err := tpl.Execute(w, tData)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
-
-/*
-func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
-	body := r.FormValue("body")
-	p := &FormData{Item: title, Field1: body}
-	err := p.save()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	http.Redirect(w, r, "/view/"+title, http.StatusFound)
-}*/
 
 func viewHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
@@ -141,13 +135,13 @@ func viewHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	template, found := templates.Get(name)
+	tpl, found := templates.Get(name)
 	if !found {
 		http.NotFound(w, r)
 		return
 	}
 
-	err := template.Execute(w, FormData{Item: "I", Field1: "f1", Field2: "f2"})
+	err := tpl.Execute(w, nil)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}

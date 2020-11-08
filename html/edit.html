@@ -1,7 +1,8 @@
-<h1>Editing {{.Item}}</h1>
+<h1>Editing</h1>
 
-<form action="/save/{{.Item}}" method="POST">
-    <div><input type="text" id="field1" name="field1" value="{{.Field1}}"></div>
-    <div><input type="text" id="field2" name="field2" value="{{.Field2}}"></div>
+<form action="{{.SaveURL}}" method="POST">
+{{range $key, $value := .Fields}}
+    <div>{{$key}}<input type="text" id="{{$key}}" name="{{$key}}" value="{{$value}}"></div>
+{{end}}
     <div><input type="submit" value="Save"></div>
 </form>

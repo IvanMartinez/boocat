@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -67,6 +68,17 @@ func GetAll() []Record {
 	}
 	records := documentsToRecords(documents)
 	return records
+}
+
+func Get(id string) Record {
+	var document map[string]string
+	objectID, _ := primitive.ObjectIDFromHex(id)
+	err := col.FindOne(context.TODO(), bson.M{"_id": objectID}).Decode(&document)
+	if err != nil {
+		log.Fatal(err)
+	}
+	record := documentToRecord(document)
+	return record
 }
 
 func documentsToRecords(maps []map[string]string) (records []Record) {

@@ -19,7 +19,7 @@ import (
 
 func main() {
 	// Parse flags
-	port := flag.String("p", "9090", "Listening port")
+	url := flag.String("url", "localhost:80", "This server's base URL")
 	dbURI := flag.String("dburi", "mongodb://127.0.0.1:27017", "Database URI")
 	flag.Parse()
 
@@ -39,5 +39,5 @@ func main() {
 	defer db.Disconnect(ctx)
 
 	// Start this server
-	strwiki.StartServer(ctx, *port)
+	strwiki.StartServer(ctx, *url)
 }

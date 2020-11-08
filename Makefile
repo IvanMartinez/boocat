@@ -10,4 +10,4 @@ build:
 
 .PHONY: run
 run:
-	go run ./cmd/main.go -p="9090"
+	go run ./cmd/main.go -url="localhost:9090"
