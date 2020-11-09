@@ -2,7 +2,7 @@
 
 <form action="{{.SaveURL}}" method="POST">
 {{range $key, $value := .Fields}}
-    <div>{{$key}}<input type="text" id="{{$key}}" name="{{$key}}" value="{{$value}}"></div>
+    <div>{{$key}}<input type="text" id="{{$key}}" name="{{$key}}" value="{{$value}}"/></div>
 {{end}}
-    <div><input type="submit" value="Save"></div>
+    <div><input type="submit" value="Save"/></div>
 </form>

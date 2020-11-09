@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -12,8 +11,8 @@ import (
 )
 
 const (
-	dbName  = "strwiki"
-	colName = "col"
+	dbName      = "strki"
+	recsColName = "records"
 )
 
 //@TODO: This may not belong to database
@@ -22,13 +21,12 @@ type Record struct {
 	Fields map[string]string
 }
 
-// Context, database and prepared statements
+// Database collections
 var (
-	cli *mongo.Client
-	col *mongo.Collection
+	recordsCol *mongo.Collection
 )
 
-// Open opens the database and prepares the statements
+// Connect connects to the database and initialies the collections
 func Connect(ctx context.Context, dbURI *string) *mongo.Client {
 	cli, err := mongo.NewClient(options.Client().ApplyURI(*dbURI))
 	if err != nil {
@@ -41,44 +39,52 @@ func Connect(ctx context.Context, dbURI *string) *mongo.Client {
 	}
 
 	db := cli.Database(dbName)
-	col = db.Collection(colName)
+	recordsCol = db.Collection(recsColName)
 
 	return cli
 }
 
-func Add(record map[string]string) {
-	//@TODO: record should be marshalled
-	insertResult, err := col.InsertOne(context.TODO(), record)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println("Inserted post with ID:", insertResult.InsertedID)
+// Add adds a new record to the database with the given fields
+func Add(ctx context.Context, fields map[string]string) error {
+	_, err := recordsCol.InsertOne(ctx, fields)
+	return err
 }
 
-func GetAll() []Record {
-	cursor, err := col.Find(context.TODO(), bson.M{})
+// Update updates a record in the database
+func Update(ctx context.Context, record Record) error {
+	objectID, _ := primitive.ObjectIDFromHex(record.DbID)
+	_, err := recordsCol.ReplaceOne(ctx, bson.M{"_id": objectID},
+		record.Fields)
+	return err
+}
+
+// GetAll returns all records from
+func GetAll(ctx context.Context) ([]Record, error) {
+	cursor, err := recordsCol.Find(context.TODO(), bson.M{})
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
+
 	var documents []map[string]string
 	if err = cursor.All(context.TODO(), &documents); err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
+
 	records := documentsToRecords(documents)
-	return records
+	return records, nil
 }
 
-func Get(id string) Record {
+// Get returns a record from the database
+func Get(ctx context.Context, id string) (*Record, error) {
 	var document map[string]string
 	objectID, _ := primitive.ObjectIDFromHex(id)
-	err := col.FindOne(context.TODO(), bson.M{"_id": objectID}).Decode(&document)
+	err := recordsCol.FindOne(context.TODO(), bson.M{"_id": objectID}).Decode(&document)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
+
 	record := documentToRecord(document)
-	return record
+	return &record, nil
 }
 
 func documentsToRecords(maps []map[string]string) (records []Record) {
