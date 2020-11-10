@@ -14,6 +14,13 @@ import (
 	"github.com/ivanmartinez/strwiki/templates"
 )
 
+type FieldWithValue struct {
+	Name        string
+	Label       string
+	Description string
+	Value       string
+}
+
 var httpURL string
 
 // StartServer starts this HTTP server
@@ -26,7 +33,7 @@ func StartServer(ctx context.Context, url string) {
 	router := mux.NewRouter()
 	// Register handle functions
 	router.HandleFunc("/test", testHandler)
-	router.HandleFunc("/edit", makeHandler(editNewHandler, "new"))
+	router.HandleFunc("/edit", makeHandler(editNewHandler, "edit"))
 	router.HandleFunc("/edit/{id}", makeHandler(editExistingHandler, "edit"))
 	router.HandleFunc("/save", makeHandler(saveNewHandler, "list"))
 	router.HandleFunc("/save/{id}", makeHandler(saveExistingHandler, "list"))
@@ -75,24 +82,30 @@ func makeHandler(tplHandler func(http.ResponseWriter, *http.Request) interface{}
 }
 
 func editNewHandler(w http.ResponseWriter, r *http.Request) interface{} {
+	form, _ := database.GetForm(r.Context(), "")
+
 	type templateData struct {
+		Name    string
+		Fields  []FieldWithValue
 		SaveURL template.URL
-		Fields  map[string]string
 	}
 	tData := templateData{
+		Name:    form.Name,
+		Fields:  fieldsWithValue(form, nil),
 		SaveURL: template.URL(httpURL + "/save"),
 	}
 	return tData
 }
 
 func editExistingHandler(w http.ResponseWriter, r *http.Request) interface{} {
+	form, _ := database.GetForm(r.Context(), "")
+
 	vars := mux.Vars(r)
 	id, found := vars["id"]
 	if !found {
 		http.NotFound(w, r)
 		return nil
 	}
-
 	record, err := database.Get(r.Context(), id)
 	if err != nil {
 		log.Printf("Error getting database record: %v\n", err)
@@ -101,17 +114,20 @@ func editExistingHandler(w http.ResponseWriter, r *http.Request) interface{} {
 	}
 
 	type templateData struct {
+		Name    string
+		Fields  []FieldWithValue
 		SaveURL template.URL
-		Fields  map[string]string
 	}
 	tData := templateData{
+		Name:    form.Name,
+		Fields:  fieldsWithValue(form, record),
 		SaveURL: template.URL(httpURL + "/save/" + record.DbID),
-		Fields:  record.Fields,
 	}
 	return tData
 }
 
 func saveNewHandler(w http.ResponseWriter, r *http.Request) interface{} {
+	// @TODO: Validate values
 	r.ParseForm()
 	fields := formToFields(r.PostForm)
 	if err := database.Add(r.Context(), fields); err != nil {
@@ -171,4 +187,17 @@ func formToFields(values url.Values) map[string]string {
 		resp[key] = values.Get(key)
 	}
 	return resp
+}
+
+func fieldsWithValue(form *database.Form, record *database.Record) []FieldWithValue {
+	fieldsWithValue := make([]FieldWithValue, len(form.Fields), len(form.Fields))
+	for index, field := range form.Fields {
+		fieldsWithValue[index].Name = field.Name
+		fieldsWithValue[index].Label = field.Label
+		fieldsWithValue[index].Description = field.Description
+		if record != nil {
+			fieldsWithValue[index].Value = record.Fields[field.Name]
+		}
+	}
+	return fieldsWithValue
 }
