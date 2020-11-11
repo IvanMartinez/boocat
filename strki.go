@@ -23,10 +23,10 @@ type FieldWithValue struct {
 // @TODO: Is There a better solution than this global variable?
 var HTTPURL string
 
-func EditNew(ctx context.Context, pathID string,
+func EditNew(ctx context.Context, db database.DB, pathID string,
 	formValues map[string]string) interface{} {
 
-	form, _ := database.GetForm(ctx, "")
+	form, _ := db.GetForm(ctx, "")
 
 	type templateData struct {
 		Name    string
@@ -41,15 +41,15 @@ func EditNew(ctx context.Context, pathID string,
 	return tData
 }
 
-func EditExisting(ctx context.Context, pathID string,
+func EditExisting(ctx context.Context, db database.DB, pathID string,
 	formValues map[string]string) interface{} {
 
-	form, _ := database.GetForm(ctx, "")
+	form, _ := db.GetForm(ctx, "")
 
-	record, err := database.Get(ctx, pathID)
+	record, err := db.Get(ctx, pathID)
 	if err != nil {
 		log.Printf("Error getting database record: %v\n", err)
-		return EditNew(ctx, pathID, formValues)
+		return EditNew(ctx, db, pathID, formValues)
 	}
 
 	type templateData struct {
@@ -65,33 +65,33 @@ func EditExisting(ctx context.Context, pathID string,
 	return tData
 }
 
-func SaveNew(ctx context.Context, pathID string,
+func SaveNew(ctx context.Context, db database.DB, pathID string,
 	formValues map[string]string) interface{} {
 
 	// @TODO: Validate values
-	if err := database.Add(ctx, formValues); err != nil {
+	if err := db.Add(ctx, formValues); err != nil {
 		log.Printf("Error adding record to database: %v\n", err)
 	}
-	return List(ctx, pathID, formValues)
+	return List(ctx, db, pathID, formValues)
 }
 
-func SaveExisting(ctx context.Context, pathID string,
+func SaveExisting(ctx context.Context, db database.DB, pathID string,
 	formValues map[string]string) interface{} {
 
 	record := database.Record{
 		DbID:   pathID,
 		Fields: formValues,
 	}
-	if err := database.Update(ctx, record); err != nil {
+	if err := db.Update(ctx, record); err != nil {
 		log.Printf("Error updating record in database: %v\n", err)
 	}
-	return List(ctx, pathID, formValues)
+	return List(ctx, db, pathID, formValues)
 }
 
-func List(ctx context.Context, pathID string,
+func List(ctx context.Context, db database.DB, pathID string,
 	fieldValues map[string]string) interface{} {
 
-	records, err := database.GetAll(ctx)
+	records, err := db.GetAll(ctx)
 	if err != nil {
 		log.Printf("Error getting records from database: %v\n", err)
 		return nil

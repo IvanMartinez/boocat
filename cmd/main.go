@@ -38,10 +38,10 @@ func main() {
 	defer db.Disconnect(ctx)
 
 	// Start the HTTP server
-	startHTTPServer(ctx, *url)
+	startHTTPServer(ctx, db, *url)
 }
 
-func startHTTPServer(ctx context.Context, url string) {
+func startHTTPServer(ctx context.Context, db database.DB, url string) {
 	// @TODO: Find the actual URL, it could be using https
 	strki.HTTPURL = "http://" + url
 	templates.LoadAll()
@@ -49,13 +49,13 @@ func startHTTPServer(ctx context.Context, url string) {
 	// Gorilla mux router allows us to use patterns in paths
 	router := mux.NewRouter()
 	// Register handle functions
-	router.HandleFunc("/edit", makeHandler(strki.EditNew, "edit"))
+	router.HandleFunc("/edit", makeHandler(strki.EditNew, db, "edit"))
 	router.HandleFunc("/edit/{pathID}",
-		makeHandler(strki.EditExisting, "edit"))
-	router.HandleFunc("/save", makeHandler(strki.SaveNew, "list"))
+		makeHandler(strki.EditExisting, db, "edit"))
+	router.HandleFunc("/save", makeHandler(strki.SaveNew, db, "list"))
 	router.HandleFunc("/save/{pathID}",
-		makeHandler(strki.SaveExisting, "list"))
-	router.HandleFunc("/list", makeHandler(strki.List, "list"))
+		makeHandler(strki.SaveExisting, db, "list"))
+	router.HandleFunc("/list", makeHandler(strki.List, db, "list"))
 
 	// Start the HTTP server in a new goroutine
 	srv := &http.Server{
@@ -85,8 +85,9 @@ func startHTTPServer(ctx context.Context, url string) {
 	}
 }
 
-func makeHandler(tplHandler func(context.Context, string,
-	map[string]string) interface{}, tplName string) http.HandlerFunc {
+func makeHandler(tplHandler func(context.Context, database.DB, string,
+	map[string]string) interface{}, db database.DB,
+	tplName string) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		tpl, found := templates.Get(tplName)
@@ -99,7 +100,7 @@ func makeHandler(tplHandler func(context.Context, string,
 		pathId, found := vars["pathID"]
 		values := formValues(r)
 
-		if tData := tplHandler(r.Context(), pathId, values); tData != nil {
+		if tData := tplHandler(r.Context(), db, pathId, values); tData != nil {
 			err := tpl.Execute(w, tData)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
