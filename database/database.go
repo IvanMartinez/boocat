@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"log"
+	"regexp"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -19,6 +20,18 @@ const (
 type Record struct {
 	DbID   string
 	Fields map[string]string
+}
+
+type Field struct {
+	Name        string
+	Label       string
+	Description string
+}
+
+type Form struct {
+	Name       string
+	Fields     []Field
+	Validators map[string]regexp.Regexp
 }
 
 // Database collections
@@ -78,13 +91,48 @@ func GetAll(ctx context.Context) ([]Record, error) {
 func Get(ctx context.Context, id string) (*Record, error) {
 	var document map[string]string
 	objectID, _ := primitive.ObjectIDFromHex(id)
-	err := recordsCol.FindOne(context.TODO(), bson.M{"_id": objectID}).Decode(&document)
+	err := recordsCol.FindOne(context.TODO(),
+		bson.M{"_id": objectID}).Decode(&document)
 	if err != nil {
 		return nil, err
 	}
 
 	record := documentToRecord(document)
 	return &record, nil
+}
+
+func GetForm(ctx context.Context, id string) (*Form, error) {
+	//@TDOO: This is a mock-up
+	nameField := Field{
+		Name:  "name",
+		Label: "Name",
+		Description: "Use only (a-z) characters, separate words with " +
+			"whitespace, start every word with capital: John Williams",
+	}
+	ageField := Field{
+		Name:        "age",
+		Label:       "Age",
+		Description: "Number between 0 and 199",
+	}
+	genderField := Field{
+		Name:        "gender",
+		Label:       "Gender",
+		Description: "M for male, F for female, or N in any other case",
+	}
+	nameRegExp, _ := regexp.Compile("([A-Z][a-z]* )*([A-Z][a-z]*)")
+	ageRegExp, _ := regexp.Compile("1?[0-9]{1,2}")
+	genderRegExp, _ := regexp.Compile("M|F|N")
+	validators := map[string]regexp.Regexp{
+		"name":   *nameRegExp,
+		"age":    *ageRegExp,
+		"gender": *genderRegExp,
+	}
+
+	return &Form{
+		Name:       "Person",
+		Fields:     []Field{nameField, ageField, genderField},
+		Validators: validators,
+	}, nil
 }
 
 func documentsToRecords(maps []map[string]string) (records []Record) {

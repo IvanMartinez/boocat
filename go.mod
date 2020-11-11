@@ -1,8 +1,5 @@
-module github.com/ivanmartinez/strwiki
+module github.com/ivanmartinez/strki
 
 go 1.14
 
-require (
-	github.com/gorilla/mux v1.8.0
-	go.mongodb.org/mongo-driver v1.4.3
-)
+require go.mongodb.org/mongo-driver v1.4.3
