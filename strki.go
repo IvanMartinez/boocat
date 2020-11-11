@@ -23,7 +23,9 @@ type FieldWithValue struct {
 // @TODO: Is There a better solution than this global variable?
 var HTTPURL string
 
-func EditNew(ctx context.Context, pathID string, formValues map[string]string) interface{} {
+func EditNew(ctx context.Context, pathID string,
+	formValues map[string]string) interface{} {
+
 	form, _ := database.GetForm(ctx, "")
 
 	type templateData struct {
@@ -39,7 +41,9 @@ func EditNew(ctx context.Context, pathID string, formValues map[string]string) i
 	return tData
 }
 
-func EditExisting(ctx context.Context, pathID string, formValues map[string]string) interface{} {
+func EditExisting(ctx context.Context, pathID string,
+	formValues map[string]string) interface{} {
+
 	form, _ := database.GetForm(ctx, "")
 
 	record, err := database.Get(ctx, pathID)
@@ -61,7 +65,9 @@ func EditExisting(ctx context.Context, pathID string, formValues map[string]stri
 	return tData
 }
 
-func SaveNew(ctx context.Context, pathID string, formValues map[string]string) interface{} {
+func SaveNew(ctx context.Context, pathID string,
+	formValues map[string]string) interface{} {
+
 	// @TODO: Validate values
 	if err := database.Add(ctx, formValues); err != nil {
 		log.Printf("Error adding record to database: %v\n", err)
@@ -69,7 +75,9 @@ func SaveNew(ctx context.Context, pathID string, formValues map[string]string) i
 	return List(ctx, pathID, formValues)
 }
 
-func SaveExisting(ctx context.Context, pathID string, formValues map[string]string) interface{} {
+func SaveExisting(ctx context.Context, pathID string,
+	formValues map[string]string) interface{} {
+
 	record := database.Record{
 		DbID:   pathID,
 		Fields: formValues,
@@ -80,7 +88,9 @@ func SaveExisting(ctx context.Context, pathID string, formValues map[string]stri
 	return List(ctx, pathID, formValues)
 }
 
-func List(ctx context.Context, pathID string, fieldValues map[string]string) interface{} {
+func List(ctx context.Context, pathID string,
+	fieldValues map[string]string) interface{} {
+
 	records, err := database.GetAll(ctx)
 	if err != nil {
 		log.Printf("Error getting records from database: %v\n", err)
@@ -98,8 +108,11 @@ func List(ctx context.Context, pathID string, fieldValues map[string]string) int
 	return tData
 }
 
-func fieldsWithValue(form *database.Form, record *database.Record) []FieldWithValue {
-	fieldsWithValue := make([]FieldWithValue, len(form.Fields), len(form.Fields))
+func fieldsWithValue(form *database.Form,
+	record *database.Record) []FieldWithValue {
+
+	fieldsWithValue := make([]FieldWithValue, len(form.Fields),
+		len(form.Fields))
 	for index, field := range form.Fields {
 		fieldsWithValue[index].Name = field.Name
 		fieldsWithValue[index].Label = field.Label

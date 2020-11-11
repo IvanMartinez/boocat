@@ -1,9 +1,3 @@
-// Copyright 2010 The Go Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
-// +build ignore
-
 package main
 
 import (
@@ -56,9 +50,11 @@ func startHTTPServer(ctx context.Context, url string) {
 	router := mux.NewRouter()
 	// Register handle functions
 	router.HandleFunc("/edit", makeHandler(strki.EditNew, "edit"))
-	router.HandleFunc("/edit/{pathID}", makeHandler(strki.EditExisting, "edit"))
+	router.HandleFunc("/edit/{pathID}",
+		makeHandler(strki.EditExisting, "edit"))
 	router.HandleFunc("/save", makeHandler(strki.SaveNew, "list"))
-	router.HandleFunc("/save/{pathID}", makeHandler(strki.SaveExisting, "list"))
+	router.HandleFunc("/save/{pathID}",
+		makeHandler(strki.SaveExisting, "list"))
 	router.HandleFunc("/list", makeHandler(strki.List, "list"))
 
 	// Start the HTTP server in a new goroutine
@@ -67,7 +63,9 @@ func startHTTPServer(ctx context.Context, url string) {
 		Handler: router,
 	}
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); err != nil
+			&& err != http.ErrServerClosed {
+
 			log.Fatalf("couldn't start HTTP server: %v", err)
 		}
 	}()
@@ -76,7 +74,8 @@ func startHTTPServer(ctx context.Context, url string) {
 	<-ctx.Done()
 
 	// New context to shut the HTTP server down
-	ctxShutDown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctxShutDown, cancel := context.WithTimeout(context.Background(), 
+		5*time.Second)
 	defer func() {
 		cancel()
 	}()
@@ -86,7 +85,9 @@ func startHTTPServer(ctx context.Context, url string) {
 	}
 }
 
-func makeHandler(tplHandler func(context.Context, string, map[string]string) interface{}, tplName string) http.HandlerFunc {
+func makeHandler(tplHandler func(context.Context, string, 
+	map[string]string) interface{}, tplName string) http.HandlerFunc {
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		tpl, found := templates.Get(tplName)
 		if !found {

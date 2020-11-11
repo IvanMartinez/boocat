@@ -91,7 +91,8 @@ func GetAll(ctx context.Context) ([]Record, error) {
 func Get(ctx context.Context, id string) (*Record, error) {
 	var document map[string]string
 	objectID, _ := primitive.ObjectIDFromHex(id)
-	err := recordsCol.FindOne(context.TODO(), bson.M{"_id": objectID}).Decode(&document)
+	err := recordsCol.FindOne(context.TODO(),
+		bson.M{"_id": objectID}).Decode(&document)
 	if err != nil {
 		return nil, err
 	}
@@ -103,9 +104,10 @@ func Get(ctx context.Context, id string) (*Record, error) {
 func GetForm(ctx context.Context, id string) (*Form, error) {
 	//@TDOO: This is a mock-up
 	nameField := Field{
-		Name:        "name",
-		Label:       "Name",
-		Description: "Use only (a-z) characters, separate words with whitespace, start every word with capital: John Williams",
+		Name:  "name",
+		Label: "Name",
+		Description: "Use only (a-z) characters, separate words with " +
+			"whitespace, start every word with capital: John Williams",
 	}
 	ageField := Field{
 		Name:        "age",
