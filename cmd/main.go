@@ -63,8 +63,8 @@ func startHTTPServer(ctx context.Context, url string) {
 		Handler: router,
 	}
 	go func() {
-		if err := srv.ListenAndServe(); err != nil
-			&& err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); err != nil &&
+			err != http.ErrServerClosed {
 
 			log.Fatalf("couldn't start HTTP server: %v", err)
 		}
@@ -74,7 +74,7 @@ func startHTTPServer(ctx context.Context, url string) {
 	<-ctx.Done()
 
 	// New context to shut the HTTP server down
-	ctxShutDown, cancel := context.WithTimeout(context.Background(), 
+	ctxShutDown, cancel := context.WithTimeout(context.Background(),
 		5*time.Second)
 	defer func() {
 		cancel()
@@ -85,7 +85,7 @@ func startHTTPServer(ctx context.Context, url string) {
 	}
 }
 
-func makeHandler(tplHandler func(context.Context, string, 
+func makeHandler(tplHandler func(context.Context, string,
 	map[string]string) interface{}, tplName string) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
