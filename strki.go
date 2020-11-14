@@ -13,11 +13,22 @@ type RequestParams struct {
 	FormValues map[string]string
 }
 
+type TemplateForm struct {
+	Name      string
+	Fields    []FieldWithValue
+	SubmitURL template.URL
+}
+
 type FieldWithValue struct {
 	Name        string
 	Label       string
 	Description string
 	Value       string
+}
+
+type TemplateList struct {
+	EditURL template.URL
+	Records []database.Record
 }
 
 // @TODO: Is There a better solution than this global variable?
@@ -28,15 +39,10 @@ func EditNew(ctx context.Context, db database.DB, pathID string,
 
 	form, _ := db.GetForm(ctx, "")
 
-	type templateData struct {
-		Name    string
-		Fields  []FieldWithValue
-		SaveURL template.URL
-	}
-	tData := templateData{
-		Name:    form.Name,
-		Fields:  fieldsWithValue(form, nil),
-		SaveURL: template.URL(HTTPURL + "/save"),
+	tData := TemplateForm{
+		Name:      form.Name,
+		Fields:    fieldsWithValue(form, nil),
+		SubmitURL: template.URL(HTTPURL + "/save"),
 	}
 	return tData
 }
@@ -52,15 +58,10 @@ func EditExisting(ctx context.Context, db database.DB, pathID string,
 		return EditNew(ctx, db, pathID, formValues)
 	}
 
-	type templateData struct {
-		Name    string
-		Fields  []FieldWithValue
-		SaveURL template.URL
-	}
-	tData := templateData{
-		Name:    form.Name,
-		Fields:  fieldsWithValue(form, record),
-		SaveURL: template.URL(HTTPURL + "/save/" + record.DbID),
+	tData := TemplateForm{
+		Name:      form.Name,
+		Fields:    fieldsWithValue(form, record),
+		SubmitURL: template.URL(HTTPURL + "/save/" + record.DbID),
 	}
 	return tData
 }
@@ -79,8 +80,8 @@ func SaveExisting(ctx context.Context, db database.DB, pathID string,
 	formValues map[string]string) interface{} {
 
 	record := database.Record{
-		DbID:   pathID,
-		Fields: formValues,
+		DbID:        pathID,
+		FieldValues: formValues,
 	}
 	if err := db.Update(ctx, record); err != nil {
 		log.Printf("Error updating record in database: %v\n", err)
@@ -97,11 +98,7 @@ func List(ctx context.Context, db database.DB, pathID string,
 		return nil
 	}
 
-	type templateData struct {
-		EditURL template.URL
-		Records []database.Record
-	}
-	tData := templateData{
+	tData := TemplateList{
 		EditURL: template.URL(HTTPURL + "/edit"),
 		Records: records,
 	}
@@ -118,7 +115,7 @@ func fieldsWithValue(form *database.Form,
 		fieldsWithValue[index].Label = field.Label
 		fieldsWithValue[index].Description = field.Description
 		if record != nil {
-			fieldsWithValue[index].Value = record.Fields[field.Name]
+			fieldsWithValue[index].Value = record.FieldValues[field.Name]
 		}
 	}
 	return fieldsWithValue

@@ -18,20 +18,20 @@ const (
 
 //@TODO: This may not belong to database
 type Record struct {
-	DbID   string
-	Fields map[string]string
-}
-
-type Field struct {
-	Name        string
-	Label       string
-	Description string
+	DbID        string
+	FieldValues map[string]string
 }
 
 type Form struct {
 	Name       string
 	Fields     []Field
 	Validators map[string]regexp.Regexp
+}
+
+type Field struct {
+	Name        string
+	Label       string
+	Description string
 }
 
 type DB interface {
@@ -75,8 +75,8 @@ func (db *MongoDB) Disconnect(ctx context.Context) {
 }
 
 // Add adds a new record to the database with the given fields
-func (db *MongoDB) Add(ctx context.Context, fields map[string]string) error {
-	_, err := db.recordsCol.InsertOne(ctx, fields)
+func (db *MongoDB) Add(ctx context.Context, values map[string]string) error {
+	_, err := db.recordsCol.InsertOne(ctx, values)
 	return err
 }
 
@@ -84,7 +84,7 @@ func (db *MongoDB) Add(ctx context.Context, fields map[string]string) error {
 func (db *MongoDB) Update(ctx context.Context, record Record) error {
 	objectID, _ := primitive.ObjectIDFromHex(record.DbID)
 	_, err := db.recordsCol.ReplaceOne(ctx, bson.M{"_id": objectID},
-		record.Fields)
+		record.FieldValues)
 	return err
 }
 
@@ -161,12 +161,12 @@ func documentsToRecords(maps []map[string]string) (records []Record) {
 }
 
 func documentToRecord(m map[string]string) (record Record) {
-	record.Fields = make(map[string]string)
+	record.FieldValues = make(map[string]string)
 	for key, value := range m {
 		if key == "_id" {
 			record.DbID = value
 		} else {
-			record.Fields[key] = value
+			record.FieldValues[key] = value
 		}
 	}
 	return record

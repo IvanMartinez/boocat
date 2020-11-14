@@ -97,7 +97,7 @@ func makeHandler(tplHandler func(context.Context, database.DB, string,
 		}
 
 		vars := mux.Vars(r)
-		pathId, found := vars["pathID"]
+		pathId := vars["pathID"]
 		values := formValues(r)
 
 		if tData := tplHandler(r.Context(), db, pathId, values); tData != nil {
