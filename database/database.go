@@ -23,15 +23,15 @@ type Record struct {
 }
 
 type Form struct {
-	Name       string
-	Fields     []Field
-	Validators map[string]regexp.Regexp
+	Name   string
+	Fields []FormField
 }
 
-type Field struct {
+type FormField struct {
 	Name        string
 	Label       string
 	Description string
+	Validator   *regexp.Regexp
 }
 
 type DB interface {
@@ -120,35 +120,32 @@ func (db *MongoDB) Get(ctx context.Context, id string) (*Record, error) {
 
 func (db *MongoDB) GetForm(ctx context.Context, id string) (*Form, error) {
 	//@TDOO: This is a mock-up
-	nameField := Field{
+	nameRegExp, _ := regexp.Compile("([A-Z][a-z]* )*([A-Z][a-z]*)")
+	nameField := FormField{
 		Name:  "name",
 		Label: "Name",
 		Description: "Use only (a-z) characters, separate words with " +
 			"whitespace, start every word with capital: John Williams",
+		Validator: nameRegExp,
 	}
-	ageField := Field{
+	ageRegExp, _ := regexp.Compile("1?[0-9]{1,2}")
+	ageField := FormField{
 		Name:        "age",
 		Label:       "Age",
 		Description: "Number between 0 and 199",
+		Validator:   ageRegExp,
 	}
-	genderField := Field{
+	genderRegExp, _ := regexp.Compile("M|F|N")
+	genderField := FormField{
 		Name:        "gender",
 		Label:       "Gender",
 		Description: "M for male, F for female, or N in any other case",
-	}
-	nameRegExp, _ := regexp.Compile("([A-Z][a-z]* )*([A-Z][a-z]*)")
-	ageRegExp, _ := regexp.Compile("1?[0-9]{1,2}")
-	genderRegExp, _ := regexp.Compile("M|F|N")
-	validators := map[string]regexp.Regexp{
-		"name":   *nameRegExp,
-		"age":    *ageRegExp,
-		"gender": *genderRegExp,
+		Validator:   genderRegExp,
 	}
 
 	return &Form{
-		Name:       "Person",
-		Fields:     []Field{nameField, ageField, genderField},
-		Validators: validators,
+		Name:   "Person",
+		Fields: []FormField{nameField, ageField, genderField},
 	}, nil
 }
 

@@ -98,9 +98,9 @@ func makeHandler(tplHandler func(context.Context, database.DB, string,
 
 		vars := mux.Vars(r)
 		pathId := vars["pathID"]
-		values := formValues(r)
+		submittedValues := submittedFormValues(r)
 
-		if tData := tplHandler(r.Context(), db, pathId, values); tData != nil {
+		if tData := tplHandler(r.Context(), db, pathId, submittedValues); tData != nil {
 			err := tpl.Execute(w, tData)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -109,7 +109,7 @@ func makeHandler(tplHandler func(context.Context, database.DB, string,
 	}
 }
 
-func formValues(r *http.Request) map[string]string {
+func submittedFormValues(r *http.Request) map[string]string {
 	values := make(map[string]string)
 
 	r.ParseForm()

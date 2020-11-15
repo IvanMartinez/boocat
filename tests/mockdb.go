@@ -2,26 +2,33 @@ package tests
 
 import (
 	"context"
-	"math/rand"
 	"regexp"
+	"strconv"
 
 	"github.com/ivanmartinez/strki/database"
 )
 
 type MockDB struct {
-	records map[string]database.Record
+	lastIDNumber int
+	records      map[string]database.Record
 }
 
-func NewDB(records map[string]database.Record) (db *MockDB) {
+func NewDB() (db *MockDB) {
+	records := make(map[string]database.Record, 0)
 	return &MockDB{
-		records: records,
+		lastIDNumber: 0,
+		records:      records,
 	}
 }
 
+func (db *MockDB) LastID() string {
+	return "rcrd" + strconv.Itoa(db.lastIDNumber)
+}
+
 func (db *MockDB) Add(ctx context.Context, values map[string]string) error {
-	id := randString(5)
-	db.records[id] = database.Record{
-		DbID:        id,
+	ID := db.nextID()
+	db.records[ID] = database.Record{
+		DbID:        ID,
 		FieldValues: values,
 	}
 
@@ -53,44 +60,35 @@ func (db *MockDB) Get(ctx context.Context, id string) (*database.Record, error) 
 
 func (db *MockDB) GetForm(ctx context.Context, id string) (*database.Form, error) {
 	//@TDOO: This is a mock-up
-	nameField := database.Field{
-		Name:  "name",
-		Label: "Name",
-		Description: "Use only (a-z) characters, separate words with " +
-			"whitespace, start every word with capital: John Williams",
+	nameRegExp, _ := regexp.Compile("([A-Z][a-z]* )*([A-Z][a-z]*)")
+	nameField := database.FormField{
+		Name:        "name",
+		Label:       "Name",
+		Description: "A-Z,a-z",
+		Validator:   nameRegExp,
 	}
-	ageField := database.Field{
+	ageRegExp, _ := regexp.Compile("1?[0-9]{1,2}")
+	ageField := database.FormField{
 		Name:        "age",
 		Label:       "Age",
-		Description: "Number between 0 and 199",
+		Description: "0-199",
+		Validator:   ageRegExp,
 	}
-	genderField := database.Field{
+	genderRegExp, _ := regexp.Compile("M|F|N")
+	genderField := database.FormField{
 		Name:        "gender",
 		Label:       "Gender",
-		Description: "M for male, F for female, or N in any other case",
-	}
-	nameRegExp, _ := regexp.Compile("([A-Z][a-z]* )*([A-Z][a-z]*)")
-	ageRegExp, _ := regexp.Compile("1?[0-9]{1,2}")
-	genderRegExp, _ := regexp.Compile("M|F|N")
-	validators := map[string]regexp.Regexp{
-		"name":   *nameRegExp,
-		"age":    *ageRegExp,
-		"gender": *genderRegExp,
+		Description: "M/F/N",
+		Validator:   genderRegExp,
 	}
 
 	return &database.Form{
-		Name:       "Person",
-		Fields:     []database.Field{nameField, ageField, genderField},
-		Validators: validators,
+		Name:   "Person",
+		Fields: []database.FormField{nameField, ageField, genderField},
 	}, nil
 }
 
-func randString(n int) string {
-	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
-	}
-	return string(b)
+func (db *MockDB) nextID() string {
+	db.lastIDNumber++
+	return db.LastID()
 }

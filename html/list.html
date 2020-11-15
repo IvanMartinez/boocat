@@ -1,7 +1,6 @@
 <html></html>
-{{$editURL := .EditURL}}
-{{range .Records}}
-<div><A href="{{$editURL}}/{{.DbID}}">{{.DbID}}</A></div>
+{{range .}}
+<div><A href="{{.URL}}">{{.URL}}</A></div>
 {{end}}
-<div><A href="{{$editURL}}">[New]</A></div>
+<div><A href="http://localhost:9090/edit">New</A></div>
 </html>
