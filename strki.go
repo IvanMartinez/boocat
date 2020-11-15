@@ -13,113 +13,120 @@ type RequestParams struct {
 	FormValues map[string]string
 }
 
-type FieldWithValue struct {
+type TemplateForm struct {
+	Name      string
+	Fields    []TemplateField
+	SubmitURL template.URL
+}
+
+type TemplateField struct {
 	Name        string
 	Label       string
 	Description string
 	Value       string
 }
 
+type TemplateRecord struct {
+	URL         string
+	FieldValues map[string]string
+}
+
 // @TODO: Is There a better solution than this global variable?
 var HTTPURL string
 
-func EditNew(ctx context.Context, pathID string,
-	formValues map[string]string) interface{} {
+func EditNew(ctx context.Context, db database.DB, _pathID string,
+	_submittedValues map[string]string) interface{} {
 
-	form, _ := database.GetForm(ctx, "")
+	form, _ := db.GetForm(ctx, "")
 
-	type templateData struct {
-		Name    string
-		Fields  []FieldWithValue
-		SaveURL template.URL
-	}
-	tData := templateData{
-		Name:    form.Name,
-		Fields:  fieldsWithValue(form, nil),
-		SaveURL: template.URL(HTTPURL + "/save"),
+	tData := TemplateForm{
+		Name:      form.Name,
+		Fields:    fieldsWithValue(form, nil),
+		SubmitURL: template.URL(HTTPURL + "/save"),
 	}
 	return tData
 }
 
-func EditExisting(ctx context.Context, pathID string,
-	formValues map[string]string) interface{} {
-
-	form, _ := database.GetForm(ctx, "")
-
-	record, err := database.Get(ctx, pathID)
-	if err != nil {
-		log.Printf("Error getting database record: %v\n", err)
-		return EditNew(ctx, pathID, formValues)
-	}
-
-	type templateData struct {
-		Name    string
-		Fields  []FieldWithValue
-		SaveURL template.URL
-	}
-	tData := templateData{
-		Name:    form.Name,
-		Fields:  fieldsWithValue(form, record),
-		SaveURL: template.URL(HTTPURL + "/save/" + record.DbID),
-	}
-	return tData
-}
-
-func SaveNew(ctx context.Context, pathID string,
-	formValues map[string]string) interface{} {
+func SaveNew(ctx context.Context, db database.DB, pathID string,
+	submittedValues map[string]string) interface{} {
 
 	// @TODO: Validate values
-	if err := database.Add(ctx, formValues); err != nil {
+	if err := db.Add(ctx, submittedValues); err != nil {
 		log.Printf("Error adding record to database: %v\n", err)
 	}
-	return List(ctx, pathID, formValues)
+	return List(ctx, db, pathID, submittedValues)
 }
 
-func SaveExisting(ctx context.Context, pathID string,
-	formValues map[string]string) interface{} {
+func EditExisting(ctx context.Context, db database.DB, pathID string,
+	_submittedValues map[string]string) interface{} {
+
+	form, _ := db.GetForm(ctx, "")
+
+	record, err := db.Get(ctx, pathID)
+	if err != nil {
+		log.Printf("Error getting database record: %v\n", err)
+		return EditNew(ctx, db, pathID, nil)
+	}
+
+	tData := TemplateForm{
+		Name:      form.Name,
+		Fields:    fieldsWithValue(form, record),
+		SubmitURL: template.URL(HTTPURL + "/save/" + record.DbID),
+	}
+	return tData
+}
+
+func SaveExisting(ctx context.Context, db database.DB, pathID string,
+	submittedValues map[string]string) interface{} {
 
 	record := database.Record{
-		DbID:   pathID,
-		Fields: formValues,
+		DbID:        pathID,
+		FieldValues: submittedValues,
 	}
-	if err := database.Update(ctx, record); err != nil {
+	if err := db.Update(ctx, record); err != nil {
 		log.Printf("Error updating record in database: %v\n", err)
 	}
-	return List(ctx, pathID, formValues)
+	return List(ctx, db, pathID, submittedValues)
 }
 
-func List(ctx context.Context, pathID string,
-	fieldValues map[string]string) interface{} {
+func List(ctx context.Context, db database.DB, pathID string,
+	_submittedValues map[string]string) interface{} {
 
-	records, err := database.GetAll(ctx)
+	records, err := db.GetAll(ctx)
 	if err != nil {
 		log.Printf("Error getting records from database: %v\n", err)
 		return nil
 	}
 
-	type templateData struct {
-		EditURL template.URL
-		Records []database.Record
-	}
-	tData := templateData{
-		EditURL: template.URL(HTTPURL + "/edit"),
-		Records: records,
-	}
+	tData := templateRecords(records, HTTPURL+"/edit/")
 	return tData
 }
 
 func fieldsWithValue(form *database.Form,
-	record *database.Record) []FieldWithValue {
+	record *database.Record) []TemplateField {
 
-	fieldsWithValue := make([]FieldWithValue, len(form.Fields),
+	fieldsWithValue := make([]TemplateField, len(form.Fields),
 		len(form.Fields))
 	for index, field := range form.Fields {
 		fieldsWithValue[index].Name = field.Name
 		fieldsWithValue[index].Label = field.Label
 		fieldsWithValue[index].Description = field.Description
 		if record != nil {
-			fieldsWithValue[index].Value = record.Fields[field.Name]
+			fieldsWithValue[index].Value = record.FieldValues[field.Name]
 		}
 	}
 	return fieldsWithValue
+}
+
+func templateRecords(records []database.Record, baseURL string) []TemplateRecord {
+	tRecords := make([]TemplateRecord, len(records), len(records))
+	for i, record := range records {
+		templateRecord := TemplateRecord{
+			URL:         baseURL + record.DbID,
+			FieldValues: record.FieldValues,
+		}
+		tRecords[i] = templateRecord
+	}
+
+	return tRecords
 }

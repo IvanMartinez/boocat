@@ -6,8 +6,12 @@ debug:	### Debug Makefile itself
 
 .PHONY: build
 build:
-	go build -o wkforms ./cmd/main.go
+	go build -o strki ./cmd/main.go
 
 .PHONY: run
 run:
 	go run ./cmd/main.go -url="localhost:9090"
+
+.PHONY: test
+test:
+	go test -v ./tests

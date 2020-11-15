@@ -18,29 +18,38 @@ const (
 
 //@TODO: This may not belong to database
 type Record struct {
-	DbID   string
-	Fields map[string]string
-}
-
-type Field struct {
-	Name        string
-	Label       string
-	Description string
+	DbID        string
+	FieldValues map[string]string
 }
 
 type Form struct {
-	Name       string
-	Fields     []Field
-	Validators map[string]regexp.Regexp
+	Name   string
+	Fields []FormField
+}
+
+type FormField struct {
+	Name        string
+	Label       string
+	Description string
+	Validator   *regexp.Regexp
+}
+
+type DB interface {
+	Add(ctx context.Context, fields map[string]string) error
+	Update(ctx context.Context, record Record) error
+	GetAll(ctx context.Context) ([]Record, error)
+	Get(ctx context.Context, id string) (*Record, error)
+	GetForm(ctx context.Context, id string) (*Form, error)
 }
 
 // Database collections
-var (
+type MongoDB struct {
+	client     *mongo.Client
 	recordsCol *mongo.Collection
-)
+}
 
 // Connect connects to the database and initialies the collections
-func Connect(ctx context.Context, dbURI *string) *mongo.Client {
+func Connect(ctx context.Context, dbURI *string) *MongoDB {
 	cli, err := mongo.NewClient(options.Client().ApplyURI(*dbURI))
 	if err != nil {
 		log.Fatal(err)
@@ -52,28 +61,36 @@ func Connect(ctx context.Context, dbURI *string) *mongo.Client {
 	}
 
 	db := cli.Database(dbName)
-	recordsCol = db.Collection(recsColName)
+	recordsCol := db.Collection(recsColName)
 
-	return cli
+	return &MongoDB{
+		client:     cli,
+		recordsCol: recordsCol,
+	}
+}
+
+// Disconnect disconnects the database
+func (db *MongoDB) Disconnect(ctx context.Context) {
+	db.client.Disconnect(ctx)
 }
 
 // Add adds a new record to the database with the given fields
-func Add(ctx context.Context, fields map[string]string) error {
-	_, err := recordsCol.InsertOne(ctx, fields)
+func (db *MongoDB) Add(ctx context.Context, values map[string]string) error {
+	_, err := db.recordsCol.InsertOne(ctx, values)
 	return err
 }
 
 // Update updates a record in the database
-func Update(ctx context.Context, record Record) error {
+func (db *MongoDB) Update(ctx context.Context, record Record) error {
 	objectID, _ := primitive.ObjectIDFromHex(record.DbID)
-	_, err := recordsCol.ReplaceOne(ctx, bson.M{"_id": objectID},
-		record.Fields)
+	_, err := db.recordsCol.ReplaceOne(ctx, bson.M{"_id": objectID},
+		record.FieldValues)
 	return err
 }
 
 // GetAll returns all records from
-func GetAll(ctx context.Context) ([]Record, error) {
-	cursor, err := recordsCol.Find(context.TODO(), bson.M{})
+func (db *MongoDB) GetAll(ctx context.Context) ([]Record, error) {
+	cursor, err := db.recordsCol.Find(context.TODO(), bson.M{})
 	if err != nil {
 		return nil, err
 	}
@@ -88,10 +105,10 @@ func GetAll(ctx context.Context) ([]Record, error) {
 }
 
 // Get returns a record from the database
-func Get(ctx context.Context, id string) (*Record, error) {
+func (db *MongoDB) Get(ctx context.Context, id string) (*Record, error) {
 	var document map[string]string
 	objectID, _ := primitive.ObjectIDFromHex(id)
-	err := recordsCol.FindOne(context.TODO(),
+	err := db.recordsCol.FindOne(context.TODO(),
 		bson.M{"_id": objectID}).Decode(&document)
 	if err != nil {
 		return nil, err
@@ -101,37 +118,34 @@ func Get(ctx context.Context, id string) (*Record, error) {
 	return &record, nil
 }
 
-func GetForm(ctx context.Context, id string) (*Form, error) {
+func (db *MongoDB) GetForm(ctx context.Context, id string) (*Form, error) {
 	//@TDOO: This is a mock-up
-	nameField := Field{
+	nameRegExp, _ := regexp.Compile("([A-Z][a-z]* )*([A-Z][a-z]*)")
+	nameField := FormField{
 		Name:  "name",
 		Label: "Name",
 		Description: "Use only (a-z) characters, separate words with " +
 			"whitespace, start every word with capital: John Williams",
+		Validator: nameRegExp,
 	}
-	ageField := Field{
+	ageRegExp, _ := regexp.Compile("1?[0-9]{1,2}")
+	ageField := FormField{
 		Name:        "age",
 		Label:       "Age",
 		Description: "Number between 0 and 199",
+		Validator:   ageRegExp,
 	}
-	genderField := Field{
+	genderRegExp, _ := regexp.Compile("M|F|N")
+	genderField := FormField{
 		Name:        "gender",
 		Label:       "Gender",
 		Description: "M for male, F for female, or N in any other case",
-	}
-	nameRegExp, _ := regexp.Compile("([A-Z][a-z]* )*([A-Z][a-z]*)")
-	ageRegExp, _ := regexp.Compile("1?[0-9]{1,2}")
-	genderRegExp, _ := regexp.Compile("M|F|N")
-	validators := map[string]regexp.Regexp{
-		"name":   *nameRegExp,
-		"age":    *ageRegExp,
-		"gender": *genderRegExp,
+		Validator:   genderRegExp,
 	}
 
 	return &Form{
-		Name:       "Person",
-		Fields:     []Field{nameField, ageField, genderField},
-		Validators: validators,
+		Name:   "Person",
+		Fields: []FormField{nameField, ageField, genderField},
 	}, nil
 }
 
@@ -144,12 +158,12 @@ func documentsToRecords(maps []map[string]string) (records []Record) {
 }
 
 func documentToRecord(m map[string]string) (record Record) {
-	record.Fields = make(map[string]string)
+	record.FieldValues = make(map[string]string)
 	for key, value := range m {
 		if key == "_id" {
 			record.DbID = value
 		} else {
-			record.Fields[key] = value
+			record.FieldValues[key] = value
 		}
 	}
 	return record
