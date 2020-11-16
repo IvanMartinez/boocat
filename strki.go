@@ -34,75 +34,81 @@ type TemplateRecord struct {
 // @TODO: Is There a better solution than this global variable?
 var HTTPURL string
 
-func EditNew(ctx context.Context, db database.DB, _pathID string,
+// @TODO: Use format
+func EditNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 	_submittedValues map[string]string) interface{} {
 
-	form, _ := db.GetForm(ctx, "")
+	format, _ := db.GetFormat(ctx, pFormat)
 
 	tData := TemplateForm{
-		Name:      form.Name,
-		Fields:    fieldsWithValue(form, nil),
-		SubmitURL: template.URL(HTTPURL + "/save"),
+		Name:      format.Name,
+		Fields:    fieldsWithValue(format, nil),
+		SubmitURL: template.URL(HTTPURL + "/save/" + pFormat),
 	}
 	return tData
 }
 
-func SaveNew(ctx context.Context, db database.DB, pathID string,
+// @TODO: Use format
+func SaveNew(ctx context.Context, db database.DB, pFormat, pRecord string,
 	submittedValues map[string]string) interface{} {
 
 	// @TODO: Validate values
-	if err := db.Add(ctx, submittedValues); err != nil {
-		log.Printf("Error adding record to database: %v\n", err)
+	if err := db.AddRecord(ctx, pFormat, submittedValues); err != nil {
+		log.Printf("error adding record to database: %v\n", err)
 	}
-	return List(ctx, db, pathID, submittedValues)
+	return List(ctx, db, pFormat, pRecord, submittedValues)
 }
 
-func EditExisting(ctx context.Context, db database.DB, pathID string,
+// @TODO: Use format
+func EditExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 	_submittedValues map[string]string) interface{} {
 
-	form, _ := db.GetForm(ctx, "")
+	format, _ := db.GetFormat(ctx, pFormat)
 
-	record, err := db.Get(ctx, pathID)
+	record, err := db.GetRecord(ctx, pFormat, pRecord)
 	if err != nil {
-		log.Printf("Error getting database record: %v\n", err)
-		return EditNew(ctx, db, pathID, nil)
+		log.Printf("error getting database record: %v\n", err)
+		return EditNew(ctx, db, pFormat, pRecord, nil)
 	}
 
 	tData := TemplateForm{
-		Name:      form.Name,
-		Fields:    fieldsWithValue(form, record),
-		SubmitURL: template.URL(HTTPURL + "/save/" + record.DbID),
+		Name:   format.Name,
+		Fields: fieldsWithValue(format, record),
+		SubmitURL: template.URL(
+			HTTPURL + "/save/" + pFormat + "/" + record.DbID),
 	}
 	return tData
 }
 
-func SaveExisting(ctx context.Context, db database.DB, pathID string,
+// @TODO: Use format
+func SaveExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 	submittedValues map[string]string) interface{} {
 
 	record := database.Record{
-		DbID:        pathID,
+		DbID:        pRecord,
 		FieldValues: submittedValues,
 	}
-	if err := db.Update(ctx, record); err != nil {
-		log.Printf("Error updating record in database: %v\n", err)
+	if err := db.UpdateRecord(ctx, pFormat, record); err != nil {
+		log.Printf("error updating record in database: %v\n", err)
 	}
-	return List(ctx, db, pathID, submittedValues)
+	return List(ctx, db, pFormat, pRecord, submittedValues)
 }
 
-func List(ctx context.Context, db database.DB, pathID string,
+// @TODO: Use format
+func List(ctx context.Context, db database.DB, pFormat, _pRecord string,
 	_submittedValues map[string]string) interface{} {
 
-	records, err := db.GetAll(ctx)
+	records, err := db.GetAllRecords(ctx, pFormat)
 	if err != nil {
-		log.Printf("Error getting records from database: %v\n", err)
+		log.Printf("error getting records from database: %v\n", err)
 		return nil
 	}
 
-	tData := templateRecords(records, HTTPURL+"/edit/")
+	tData := templateRecords(records, HTTPURL+"/edit/"+pFormat+"/")
 	return tData
 }
 
-func fieldsWithValue(form *database.Form,
+func fieldsWithValue(form *database.Format,
 	record *database.Record) []TemplateField {
 
 	fieldsWithValue := make([]TemplateField, len(form.Fields),
@@ -118,7 +124,9 @@ func fieldsWithValue(form *database.Form,
 	return fieldsWithValue
 }
 
-func templateRecords(records []database.Record, baseURL string) []TemplateRecord {
+func templateRecords(records []database.Record,
+	baseURL string) []TemplateRecord {
+
 	tRecords := make([]TemplateRecord, len(records), len(records))
 	for i, record := range records {
 		templateRecord := TemplateRecord{

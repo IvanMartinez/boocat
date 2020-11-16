@@ -49,13 +49,16 @@ func startHTTPServer(ctx context.Context, db database.DB, url string) {
 	// Gorilla mux router allows us to use patterns in paths
 	router := mux.NewRouter()
 	// Register handle functions
-	router.HandleFunc("/edit", makeHandler(strki.EditNew, db, "edit"))
-	router.HandleFunc("/edit/{pathID}",
+	router.HandleFunc("/edit/{pFormat}",
+		makeHandler(strki.EditNew, db, "edit"))
+	router.HandleFunc("/edit/{pFormat}/{pRecord}",
 		makeHandler(strki.EditExisting, db, "edit"))
-	router.HandleFunc("/save", makeHandler(strki.SaveNew, db, "list"))
-	router.HandleFunc("/save/{pathID}",
+	router.HandleFunc("/save/{pFormat}",
+		makeHandler(strki.SaveNew, db, "list"))
+	router.HandleFunc("/save/{pFormat}/{pRecord}",
 		makeHandler(strki.SaveExisting, db, "list"))
-	router.HandleFunc("/list", makeHandler(strki.List, db, "list"))
+	router.HandleFunc("/list/{pFormat}",
+		makeHandler(strki.List, db, "list"))
 
 	// Start the HTTP server in a new goroutine
 	srv := &http.Server{
@@ -85,7 +88,7 @@ func startHTTPServer(ctx context.Context, db database.DB, url string) {
 	}
 }
 
-func makeHandler(tplHandler func(context.Context, database.DB, string,
+func makeHandler(tplHandler func(context.Context, database.DB, string, string,
 	map[string]string) interface{}, db database.DB,
 	tplName string) http.HandlerFunc {
 
@@ -97,10 +100,13 @@ func makeHandler(tplHandler func(context.Context, database.DB, string,
 		}
 
 		vars := mux.Vars(r)
-		pathId := vars["pathID"]
+		pFormat := vars["pFormat"]
+		pRecord := vars["pRecord"]
 		submittedValues := submittedFormValues(r)
 
-		if tData := tplHandler(r.Context(), db, pathId, submittedValues); tData != nil {
+		if tData := tplHandler(r.Context(), db, pFormat, pRecord,
+			submittedValues); tData != nil {
+
 			err := tpl.Execute(w, tData)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)

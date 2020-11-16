@@ -10,102 +10,109 @@ import (
 
 func initializedDB() (db *MockDB) {
 	db = NewDB()
-	db.Add(context.TODO(), map[string]string{
-		"name":   "Karen",
-		"age":    "41",
-		"gender": "F",
+	db.AddRecord(context.TODO(), "author", map[string]string{
+		"name":      "Haruki Murakami",
+		"birthdate": "1949",
 	})
-	db.Add(context.TODO(), map[string]string{
-		"name":   "Marcus",
-		"age":    "18",
-		"gender": "M",
+	db.AddRecord(context.TODO(), "author", map[string]string{
+		"name":      "George Orwell",
+		"birthdate": "1903",
 	})
-	db.Add(context.TODO(), map[string]string{
-		"name":   "Alfredo",
-		"age":    "60",
-		"gender": "N",
+	db.AddRecord(context.TODO(), "book", map[string]string{
+		"name": "Norwegian Wood",
+		"year": "1987",
+	})
+	db.AddRecord(context.TODO(), "book", map[string]string{
+		"name": "Kafka On The Shore",
+		"year": "2002",
+	})
+	db.AddRecord(context.TODO(), "book", map[string]string{
+		"name": "Animal Farm",
+		"year": "1945",
+	})
+	db.AddRecord(context.TODO(), "book", map[string]string{
+		"name": "Nineteen Eighty-Four",
+		"year": "1949",
 	})
 	return db
 }
 
 func TestEditNew(t *testing.T) {
 	db := initializedDB()
-	form := strki.EditNew(context.TODO(), db, "", nil).(strki.TemplateForm)
 
-	checkForm(t, form, "Person", "/save", 3)
-	nameField := findTemplateField(t, form.Fields, "name")
-	checkFormField(t, nameField, "name", "Name", "A-Z,a-z", "")
-	ageField := findTemplateField(t, form.Fields, "age")
-	checkFormField(t, ageField, "age", "Age", "0-199", "")
-	genderField := findTemplateField(t, form.Fields, "gender")
-	checkFormField(t, genderField, "gender", "Gender", "M/F/N", "")
+	authorFormat := strki.EditNew(context.TODO(), db, "author", "",
+		nil).(strki.TemplateForm)
+	checkForm(t, authorFormat, "author", "/save/author", 2)
+	ageField := findTemplateField(t, authorFormat.Fields, "birthdate")
+	checkFormatField(t, ageField, "birthdate", "Year of birth", "A year", "")
+
+	bookFormat := strki.EditNew(context.TODO(), db, "book", "",
+		nil).(strki.TemplateForm)
+	checkForm(t, bookFormat, "book", "/save/book", 2)
+	nameField := findTemplateField(t, bookFormat.Fields, "year")
+	checkFormatField(t, nameField, "year", "Year", "A year", "")
+
 	// @TODO Check validators somehow?
 }
 
 func TestSaveNew(t *testing.T) {
 	db := initializedDB()
-	list := strki.SaveNew(context.TODO(), db, "",
+	list := strki.SaveNew(context.TODO(), db, "author", "",
 		map[string]string{
-			"name":   "Amelie",
-			"age":    "34",
-			"gender": "F",
+			"name":      "Miguel de Cervantes Saavedra",
+			"birthdate": "1547",
 		}).([]strki.TemplateRecord)
 
-	if len(list) != 4 {
-		t.Errorf("expected 4 records but got %v", len(list))
+	if len(list) != 3 {
+		t.Errorf("expected 3 records but got %v", len(list))
 	}
-	record := findTemplateRecord(t, list, "/edit/"+db.LastID())
-	checkRecordValue(t, record, "name", "Amelie")
-	checkRecordValue(t, record, "age", "34")
-	checkRecordValue(t, record, "gender", "F")
+	record := findTemplateRecord(t, list, "/edit/author/"+db.LastID("author"))
+	checkRecordValue(t, record, "name", "Miguel de Cervantes Saavedra")
+	checkRecordValue(t, record, "birthdate", "1547")
 }
 
 func TestEditExisting(t *testing.T) {
 	db := initializedDB()
-	form := strki.EditExisting(context.TODO(), db, db.LastID(),
+	form := strki.EditExisting(context.TODO(), db, "book", db.LastID("book"),
 		nil).(strki.TemplateForm)
 
-	checkForm(t, form, "Person", "/save/"+db.LastID(), 3)
+	checkForm(t, form, "book", "/save/book/"+db.LastID("book"), 2)
 	nameField := findTemplateField(t, form.Fields, "name")
-	checkFormField(t, nameField, "name", "Name", "A-Z,a-z", "Alfredo")
-	ageField := findTemplateField(t, form.Fields, "age")
-	checkFormField(t, ageField, "age", "Age", "0-199", "60")
-	genderField := findTemplateField(t, form.Fields, "gender")
-	checkFormField(t, genderField, "gender", "Gender", "M/F/N", "N")
+	checkFormatField(t, nameField, "name", "Name", "A-Z,a-z",
+		"Nineteen Eighty-Four")
 	// @TODO Check validators somehow?
 }
 
 func TestSaveExisting(t *testing.T) {
 	db := initializedDB()
-	records := strki.SaveExisting(context.TODO(), db, db.LastID(),
+	records := strki.SaveExisting(context.TODO(), db, "author",
+		db.LastID("author"),
 		map[string]string{
-			"name":   "Amelie",
-			"age":    "34",
-			"gender": "F",
+			"name":      "Simone de Beauvoir",
+			"birthdate": "1908",
 		}).([]strki.TemplateRecord)
 
-	if len(records) != 3 {
-		t.Errorf("expected 3 records but got %v", len(records))
+	if len(records) != 2 {
+		t.Errorf("expected 2 records but got %v", len(records))
 	}
-	record := findTemplateRecord(t, records, "/edit/"+db.LastID())
-	checkRecordValue(t, record, "name", "Amelie")
-	checkRecordValue(t, record, "age", "34")
-	checkRecordValue(t, record, "gender", "F")
+	record := findTemplateRecord(t, records,
+		"/edit/author/"+db.LastID("author"))
+	checkRecordValue(t, record, "name", "Simone de Beauvoir")
+	checkRecordValue(t, record, "birthdate", "1908")
 }
 
 func TestList(t *testing.T) {
 	db := initializedDB()
-	records := strki.List(context.TODO(), db, "", nil).([]strki.TemplateRecord)
+	records := strki.List(context.TODO(), db, "book", "",
+		nil).([]strki.TemplateRecord)
 
-	if len(records) != 3 {
-		t.Errorf("expected 3 records but got %v", len(records))
+	if len(records) != 4 {
+		t.Errorf("expected 4 records but got %v", len(records))
 	}
-	record1 := findTemplateRecord(t, records, "/edit/rcrd1")
-	checkRecordValue(t, record1, "name", "Karen")
-	record2 := findTemplateRecord(t, records, "/edit/rcrd2")
-	checkRecordValue(t, record2, "age", "18")
-	record3 := findTemplateRecord(t, records, "/edit/rcrd3")
-	checkRecordValue(t, record3, "gender", "N")
+	record1 := findTemplateRecord(t, records, "/edit/book/book1")
+	checkRecordValue(t, record1, "name", "Norwegian Wood")
+	record2 := findTemplateRecord(t, records, "/edit/book/book2")
+	checkRecordValue(t, record2, "year", "2002")
 }
 
 func checkForm(t *testing.T, form strki.TemplateForm, name, url string,
@@ -138,7 +145,7 @@ func findTemplateField(t *testing.T, fields []strki.TemplateField,
 	return strki.TemplateField{}
 }
 
-func checkFormField(t *testing.T, field strki.TemplateField, name, label,
+func checkFormatField(t *testing.T, field strki.TemplateField, name, label,
 	description, value string) {
 
 	if field.Name != name {
