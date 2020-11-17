@@ -34,7 +34,7 @@ func main() {
 	}()
 
 	// Open the database
-	db := database.Connect(ctx, dbURI)
+	db := database.Connect(ctx, dbURI, []string{"author", "book"})
 	defer db.Disconnect(ctx)
 
 	// Start the HTTP server
@@ -96,7 +96,7 @@ func makeHandler(tplHandler func(context.Context, database.DB, string, string,
 		tpl, found := templates.Get(tplName)
 		if !found {
 			log.Fatalf("Couldn't find template %v", tplName)
-			return
+			http.NotFound(w, r)
 		}
 
 		vars := mux.Vars(r)
@@ -111,6 +111,8 @@ func makeHandler(tplHandler func(context.Context, database.DB, string, string,
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
+		} else {
+			http.NotFound(w, r)
 		}
 	}
 }

@@ -38,7 +38,10 @@ var HTTPURL string
 func EditNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 	_submittedValues map[string]string) interface{} {
 
-	format, _ := db.GetFormat(ctx, pFormat)
+	format, err := db.GetFormat(ctx, pFormat)
+	if err != nil {
+		return nil
+	}
 
 	tData := TemplateForm{
 		Name:      format.Name,
@@ -49,21 +52,24 @@ func EditNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 }
 
 // @TODO: Use format
-func SaveNew(ctx context.Context, db database.DB, pFormat, pRecord string,
+func SaveNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 	submittedValues map[string]string) interface{} {
 
 	// @TODO: Validate values
 	if err := db.AddRecord(ctx, pFormat, submittedValues); err != nil {
 		log.Printf("error adding record to database: %v\n", err)
 	}
-	return List(ctx, db, pFormat, pRecord, submittedValues)
+	return List(ctx, db, pFormat, "", submittedValues)
 }
 
 // @TODO: Use format
 func EditExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 	_submittedValues map[string]string) interface{} {
 
-	format, _ := db.GetFormat(ctx, pFormat)
+	format, err := db.GetFormat(ctx, pFormat)
+	if err != nil {
+		return nil
+	}
 
 	record, err := db.GetRecord(ctx, pFormat, pRecord)
 	if err != nil {
@@ -91,7 +97,7 @@ func SaveExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 	if err := db.UpdateRecord(ctx, pFormat, record); err != nil {
 		log.Printf("error updating record in database: %v\n", err)
 	}
-	return List(ctx, db, pFormat, pRecord, submittedValues)
+	return List(ctx, db, pFormat, "", submittedValues)
 }
 
 // @TODO: Use format

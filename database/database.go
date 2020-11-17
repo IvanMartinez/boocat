@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"errors"
 	"log"
 	"regexp"
 
@@ -12,8 +13,7 @@ import (
 )
 
 const (
-	dbName      = "strki"
-	recsColName = "records"
+	dbName = "strki"
 )
 
 // @TODO: Remove this type?
@@ -45,12 +45,14 @@ type DB interface {
 
 // Database collections
 type MongoDB struct {
-	client     *mongo.Client
-	recordsCol *mongo.Collection
+	client      *mongo.Client
+	collections map[string]*mongo.Collection
 }
 
 // Connect connects to the database and initialies the collections
-func Connect(ctx context.Context, dbURI *string) *MongoDB {
+func Connect(ctx context.Context, dbURI *string,
+	formats []string) *MongoDB {
+
 	cli, err := mongo.NewClient(options.Client().ApplyURI(*dbURI))
 	if err != nil {
 		log.Fatal(err)
@@ -62,11 +64,15 @@ func Connect(ctx context.Context, dbURI *string) *MongoDB {
 	}
 
 	db := cli.Database(dbName)
-	recordsCol := db.Collection(recsColName)
+
+	collections := make(map[string]*mongo.Collection, len(formats))
+	for _, format := range formats {
+		collections[format] = db.Collection(format)
+	}
 
 	return &MongoDB{
-		client:     cli,
-		recordsCol: recordsCol,
+		client:      cli,
+		collections: collections,
 	}
 }
 
@@ -80,8 +86,12 @@ func (db *MongoDB) Disconnect(ctx context.Context) {
 func (db *MongoDB) AddRecord(ctx context.Context, format string,
 	values map[string]string) error {
 
-	_, err := db.recordsCol.InsertOne(ctx, values)
-	return err
+	if col, found := db.collections[format]; found {
+		_, err := col.InsertOne(ctx, values)
+		return err
+	}
+
+	return errors.New("format not found")
 }
 
 // Update updates a record in the database
@@ -89,10 +99,14 @@ func (db *MongoDB) AddRecord(ctx context.Context, format string,
 func (db *MongoDB) UpdateRecord(ctx context.Context, format string,
 	record Record) error {
 
-	objectID, _ := primitive.ObjectIDFromHex(record.DbID)
-	_, err := db.recordsCol.ReplaceOne(ctx, bson.M{"_id": objectID},
-		record.FieldValues)
-	return err
+	if col, found := db.collections[format]; found {
+		objectID, _ := primitive.ObjectIDFromHex(record.DbID)
+		_, err := col.ReplaceOne(ctx, bson.M{"_id": objectID},
+			record.FieldValues)
+		return err
+	}
+
+	return errors.New("format not found")
 }
 
 // GetAll returns all records from
@@ -100,18 +114,22 @@ func (db *MongoDB) UpdateRecord(ctx context.Context, format string,
 func (db *MongoDB) GetAllRecords(ctx context.Context,
 	format string) ([]Record, error) {
 
-	cursor, err := db.recordsCol.Find(context.TODO(), bson.M{})
-	if err != nil {
-		return nil, err
+	if col, found := db.collections[format]; found {
+		cursor, err := col.Find(context.TODO(), bson.M{})
+		if err != nil {
+			return nil, err
+		}
+
+		var documents []map[string]string
+		if err = cursor.All(context.TODO(), &documents); err != nil {
+			return nil, err
+		}
+
+		records := documentsToRecords(documents)
+		return records, nil
 	}
 
-	var documents []map[string]string
-	if err = cursor.All(context.TODO(), &documents); err != nil {
-		return nil, err
-	}
-
-	records := documentsToRecords(documents)
-	return records, nil
+	return nil, errors.New("format not found")
 }
 
 // Get returns a record from the database
@@ -119,16 +137,20 @@ func (db *MongoDB) GetAllRecords(ctx context.Context,
 func (db *MongoDB) GetRecord(ctx context.Context, format,
 	id string) (*Record, error) {
 
-	var document map[string]string
-	objectID, _ := primitive.ObjectIDFromHex(id)
-	err := db.recordsCol.FindOne(context.TODO(),
-		bson.M{"_id": objectID}).Decode(&document)
-	if err != nil {
-		return nil, err
+	if col, found := db.collections[format]; found {
+		var document map[string]string
+		objectID, _ := primitive.ObjectIDFromHex(id)
+		err := col.FindOne(context.TODO(),
+			bson.M{"_id": objectID}).Decode(&document)
+		if err != nil {
+			return nil, err
+		}
+
+		record := documentToRecord(document)
+		return &record, nil
 	}
 
-	record := documentToRecord(document)
-	return &record, nil
+	return nil, errors.New("format not found")
 }
 
 //@TDOO: This is a mock-up
@@ -176,7 +198,7 @@ func (db *MongoDB) GetFormat(ctx context.Context, id string) (*Format, error) {
 		}, nil
 
 	} else {
-		return &Format{}, nil
+		return nil, errors.New("format not found")
 	}
 }
 
