@@ -8,11 +8,14 @@ import (
 	"strings"
 )
 
+// dir is where the templates are
 const dir = "html/"
 
-// @TODO add mux
+// templates is the map of templates to generate HTML pages
+// @TODO add sync.RWMutex for concurrent access
 var templates map[string]*template.Template
 
+// LoadAll loads all templates from the files in dir
 func LoadAll() {
 	templates = make(map[string]*template.Template)
 
@@ -28,9 +31,9 @@ func LoadAll() {
 	}
 }
 
+// Load loads a template from a file
 func Load(name string) {
 	template, err := template.ParseFiles(dir + name)
-	//ioutil.ReadFile(dir + name)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -38,6 +41,7 @@ func Load(name string) {
 	templates[strings.TrimSuffix(name, filepath.Ext(name))] = template
 }
 
+// Get returns a template by its name
 func Get(name string) (*template.Template, bool) {
 	template, found := templates[name]
 	return template, found

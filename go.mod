@@ -1,4 +1,4 @@
-module github.com/ivanmartinez/strki
+module github.com/ivanmartinez/boocat
 
 go 1.14
 

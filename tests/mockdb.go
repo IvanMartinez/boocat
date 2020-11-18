@@ -6,28 +6,34 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/ivanmartinez/strki/database"
+	"github.com/ivanmartinez/boocat/database"
 )
 
+// MockDB is a database mock for testing
 type MockDB struct {
-	collections map[string]*Collection
+	recordSets map[string]*RecordSet
 }
 
-type Collection struct {
-	name         string
+// RecordSet is a set of records of a specific format (author, book...)
+type RecordSet struct {
+	// Name of the set
+	name string
+	// Last number used in the generation of record IDs
 	lastIDNumber int
-	records      map[string]database.Record
+	// Map of records
+	records map[string]database.Record
 }
 
+// NewDB returns a new MockDB with sets for author and book records
 func NewDB() (db *MockDB) {
 	return &MockDB{
-		collections: map[string]*Collection{
-			"author": &Collection{
+		recordSets: map[string]*RecordSet{
+			"author": &RecordSet{
 				name:         "author",
 				lastIDNumber: 0,
 				records:      make(map[string]database.Record, 0),
 			},
-			"book": &Collection{
+			"book": &RecordSet{
 				name:         "book",
 				lastIDNumber: 0,
 				records:      make(map[string]database.Record, 0),
@@ -36,16 +42,18 @@ func NewDB() (db *MockDB) {
 	}
 }
 
+// AddRecord adds a new record (author, book...) with the given field values to
+// the database
 func (db *MockDB) AddRecord(ctx context.Context, format string,
 	values map[string]string) error {
 
-	col, found := db.collections[format]
+	rSet, found := db.recordSets[format]
 	if !found {
 		return fmt.Errorf("unknown format %v", format)
 	}
 
-	ID := col.nextID()
-	col.records[ID] = database.Record{
+	ID := rSet.nextID()
+	rSet.records[ID] = database.Record{
 		DbID:        ID,
 		FieldValues: values,
 	}
@@ -53,30 +61,33 @@ func (db *MockDB) AddRecord(ctx context.Context, format string,
 	return nil
 }
 
+// Update updates a database record (author, book...) with the given
+// field values
 func (db *MockDB) UpdateRecord(ctx context.Context, format string,
 	record database.Record) error {
 
-	col, found := db.collections[format]
+	rSet, found := db.recordSets[format]
 	if !found {
 		return fmt.Errorf("unknown format %v", format)
 	}
 
-	col.records[record.DbID] = record
+	rSet.records[record.DbID] = record
 
 	return nil
 }
 
+// GetAll returns all records of a specific format from the database
 func (db *MockDB) GetAllRecords(ctx context.Context,
 	format string) ([]database.Record, error) {
 
-	col, found := db.collections[format]
+	rSet, found := db.recordSets[format]
 	if !found {
 		return nil, fmt.Errorf("unknown format %v", format)
 	}
 
-	slice := make([]database.Record, len(col.records), len(col.records))
+	slice := make([]database.Record, len(rSet.records), len(rSet.records))
 	i := 0
-	for _, record := range col.records {
+	for _, record := range rSet.records {
 		slice[i] = record
 		i++
 	}
@@ -84,21 +95,23 @@ func (db *MockDB) GetAllRecords(ctx context.Context,
 	return slice, nil
 }
 
+// Get returns a record from the database
 func (db *MockDB) GetRecord(ctx context.Context, format,
 	id string) (*database.Record, error) {
 
-	col, found := db.collections[format]
+	rSet, found := db.recordSets[format]
 	if !found {
 		return nil, fmt.Errorf("unknown format %v", format)
 	}
 
-	if record, found := col.records[id]; found {
+	if record, found := rSet.records[id]; found {
 		return &record, nil
 	}
 
 	return nil, nil
 }
 
+// GetFormat returns a format
 func (db *MockDB) GetFormat(ctx context.Context,
 	id string) (*database.Format, error) {
 	//@TDOO: This is a mock-up
@@ -149,20 +162,25 @@ func (db *MockDB) GetFormat(ctx context.Context,
 	}
 }
 
+// LastID takes a format and returns the database ID of the last record of
+// that format inserted in the database. This is used in testing to be able to
+// retrieve the record and check its values.
 func (db *MockDB) LastID(format string) string {
-	col, found := db.collections[format]
+	rSet, found := db.recordSets[format]
 	if !found {
 		return ""
 	}
 
-	return col.name + strconv.Itoa(col.lastIDNumber)
+	return rSet.name + strconv.Itoa(rSet.lastIDNumber)
 }
 
-func (col *Collection) lastID() string {
-	return col.name + strconv.Itoa(col.lastIDNumber)
+// lastID returns the database ID of the last record inserted in the set
+func (rSet *RecordSet) lastID() string {
+	return rSet.name + strconv.Itoa(rSet.lastIDNumber)
 }
 
-func (col *Collection) nextID() string {
-	col.lastIDNumber++
-	return col.lastID()
+// nextID generates a new ID to insert a record in a set
+func (rSet *RecordSet) nextID() string {
+	rSet.lastIDNumber++
+	return rSet.lastID()
 }

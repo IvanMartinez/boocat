@@ -1,24 +1,22 @@
-package strki
+package boocat
 
 import (
 	"context"
 	"html/template"
 	"log"
 
-	"github.com/ivanmartinez/strki/database"
+	"github.com/ivanmartinez/boocat/database"
 )
 
-type RequestParams struct {
-	PathID     string
-	FormValues map[string]string
-}
-
+// TemplateForm contains the data to generate a form with a HTML template
 type TemplateForm struct {
 	Name      string
 	Fields    []TemplateField
 	SubmitURL template.URL
 }
 
+// TemplateField contains the data to generate a field of a form with
+// a HTML template
 type TemplateField struct {
 	Name        string
 	Label       string
@@ -26,15 +24,18 @@ type TemplateField struct {
 	Value       string
 }
 
+// TemplateRecord contains the data to show a record (author, book...) with
+// a HTML template
 type TemplateRecord struct {
 	URL         string
 	FieldValues map[string]string
 }
 
+// HTTPURL is the base URL for links and URLs in the HTML templates
 // @TODO: Is There a better solution than this global variable?
 var HTTPURL string
 
-// @TODO: Use format
+// EditNew returns the data to generate a HTML form based on the format
 func EditNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 	_submittedValues map[string]string) interface{} {
 
@@ -51,7 +52,7 @@ func EditNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 	return tData
 }
 
-// @TODO: Use format
+// SaveNew saves (creates) a new record (author, book, etc)
 func SaveNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 	submittedValues map[string]string) interface{} {
 
@@ -62,7 +63,9 @@ func SaveNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 	return List(ctx, db, pFormat, "", submittedValues)
 }
 
-// @TODO: Use format
+// EditNew returns the data to generate a HTML form based on the format.
+// It also returns the values of a record (author, book...) to pre-fill the
+// form.
 func EditExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 	_submittedValues map[string]string) interface{} {
 
@@ -86,7 +89,7 @@ func EditExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 	return tData
 }
 
-// @TODO: Use format
+// SaveNew saves (updates) a existing record (author, book...)
 func SaveExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 	submittedValues map[string]string) interface{} {
 
@@ -100,7 +103,7 @@ func SaveExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 	return List(ctx, db, pFormat, "", submittedValues)
 }
 
-// @TODO: Use format
+// List returns the data to generate a HTML list of records (authors, books...)
 func List(ctx context.Context, db database.DB, pFormat, _pRecord string,
 	_submittedValues map[string]string) interface{} {
 
@@ -114,12 +117,15 @@ func List(ctx context.Context, db database.DB, pFormat, _pRecord string,
 	return tData
 }
 
-func fieldsWithValue(form *database.Format,
+// fieldsWithValue takes a format and a returns a slice of TemplateField to
+// generate a HTML form. If a record (author, book...) is passed then the
+// fields will have the values of the record.
+func fieldsWithValue(format *database.Format,
 	record *database.Record) []TemplateField {
 
-	fieldsWithValue := make([]TemplateField, len(form.Fields),
-		len(form.Fields))
-	for index, field := range form.Fields {
+	fieldsWithValue := make([]TemplateField, len(format.Fields),
+		len(format.Fields))
+	for index, field := range format.Fields {
 		fieldsWithValue[index].Name = field.Name
 		fieldsWithValue[index].Label = field.Label
 		fieldsWithValue[index].Description = field.Description
@@ -130,6 +136,8 @@ func fieldsWithValue(form *database.Format,
 	return fieldsWithValue
 }
 
+// templateRecords takes a slice of records (authors, books...) and returns
+// a slice of TemplateRecords to generate a HTML list of records
 func templateRecords(records []database.Record,
 	baseURL string) []TemplateRecord {
 

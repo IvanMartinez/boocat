@@ -11,9 +11,9 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/ivanmartinez/strki"
-	"github.com/ivanmartinez/strki/database"
-	"github.com/ivanmartinez/strki/templates"
+	"github.com/ivanmartinez/boocat"
+	"github.com/ivanmartinez/boocat/database"
+	"github.com/ivanmartinez/boocat/templates"
 )
 
 func main() {
@@ -41,24 +41,25 @@ func main() {
 	startHTTPServer(ctx, db, *url)
 }
 
+// startHTTPServer registers handlers for URL routes and starts the HTTP server
 func startHTTPServer(ctx context.Context, db database.DB, url string) {
 	// @TODO: Find the actual URL, it could be using https
-	strki.HTTPURL = "http://" + url
+	boocat.HTTPURL = "http://" + url
 	templates.LoadAll()
 
 	// Gorilla mux router allows us to use patterns in paths
 	router := mux.NewRouter()
 	// Register handle functions
 	router.HandleFunc("/edit/{pFormat}",
-		makeHandler(strki.EditNew, db, "edit"))
+		makeHandler(boocat.EditNew, db, "edit"))
 	router.HandleFunc("/edit/{pFormat}/{pRecord}",
-		makeHandler(strki.EditExisting, db, "edit"))
+		makeHandler(boocat.EditExisting, db, "edit"))
 	router.HandleFunc("/save/{pFormat}",
-		makeHandler(strki.SaveNew, db, "list"))
+		makeHandler(boocat.SaveNew, db, "list"))
 	router.HandleFunc("/save/{pFormat}/{pRecord}",
-		makeHandler(strki.SaveExisting, db, "list"))
+		makeHandler(boocat.SaveExisting, db, "list"))
 	router.HandleFunc("/list/{pFormat}",
-		makeHandler(strki.List, db, "list"))
+		makeHandler(boocat.List, db, "list"))
 
 	// Start the HTTP server in a new goroutine
 	srv := &http.Server{
@@ -76,7 +77,7 @@ func startHTTPServer(ctx context.Context, db database.DB, url string) {
 	// Wait for ctx to be cancelled
 	<-ctx.Done()
 
-	// New context to shut the HTTP server down
+	// New context with timeout to shut the HTTP server down
 	ctxShutDown, cancel := context.WithTimeout(context.Background(),
 		5*time.Second)
 	defer func() {
@@ -88,25 +89,33 @@ func startHTTPServer(ctx context.Context, db database.DB, url string) {
 	}
 }
 
+// makeHandler returns a handler function created from the function passed as
+// parameter. This reduces boilerplate since common handler operations are
+// implemented here.
 func makeHandler(tplHandler func(context.Context, database.DB, string, string,
 	map[string]string) interface{}, db database.DB,
 	tplName string) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Get the template to generate the output
 		tpl, found := templates.Get(tplName)
 		if !found {
 			log.Fatalf("Couldn't find template %v", tplName)
 			http.NotFound(w, r)
 		}
 
+		// Read the path variables and submitted form values
 		vars := mux.Vars(r)
 		pFormat := vars["pFormat"]
 		pRecord := vars["pRecord"]
 		submittedValues := submittedFormValues(r)
 
+		// Perform the specific operation for the route
 		if tData := tplHandler(r.Context(), db, pFormat, pRecord,
 			submittedValues); tData != nil {
 
+			// Generate the output with the template and the result of the
+			// operation
 			err := tpl.Execute(w, tData)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -117,6 +126,7 @@ func makeHandler(tplHandler func(context.Context, database.DB, string, string,
 	}
 }
 
+// submittedFormValues returns a map with the values of the submitted form
 func submittedFormValues(r *http.Request) map[string]string {
 	values := make(map[string]string)
 

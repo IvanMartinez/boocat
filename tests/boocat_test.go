@@ -5,9 +5,10 @@ import (
 	"html/template"
 	"testing"
 
-	"github.com/ivanmartinez/strki"
+	"github.com/ivanmartinez/boocat"
 )
 
+// initiaziledDB returns a MockDB with data for testing
 func initializedDB() (db *MockDB) {
 	db = NewDB()
 	db.AddRecord(context.TODO(), "author", map[string]string{
@@ -37,85 +38,127 @@ func initializedDB() (db *MockDB) {
 	return db
 }
 
+// TestEditNew tests boocat.EditNew
 func TestEditNew(t *testing.T) {
+	// Initialize database
 	db := initializedDB()
 
-	authorFormat := strki.EditNew(context.TODO(), db, "author", "",
-		nil).(strki.TemplateForm)
-	checkForm(t, authorFormat, "author", "/save/author", 2)
-	ageField := findTemplateField(t, authorFormat.Fields, "birthdate")
-	checkFormatField(t, ageField, "birthdate", "Year of birth", "A year", "")
+	// Run EditNew for author format
+	authorForm := boocat.EditNew(context.TODO(), db, "author", "",
+		nil).(boocat.TemplateForm)
+	// Check the form
+	checkForm(t, authorForm, "author", "/save/author", 2)
+	// Get birthdate field from the form
+	birthField := findTemplateField(t, authorForm.Fields, "birthdate")
+	// Check birthdate field
+	checkTemplateField(t, birthField, "birthdate", "Year of birth", "A year",
+		"")
 
-	bookFormat := strki.EditNew(context.TODO(), db, "book", "",
-		nil).(strki.TemplateForm)
-	checkForm(t, bookFormat, "book", "/save/book", 2)
-	nameField := findTemplateField(t, bookFormat.Fields, "year")
-	checkFormatField(t, nameField, "year", "Year", "A year", "")
+	// Run EditNew for book format
+	bookForm := boocat.EditNew(context.TODO(), db, "book", "",
+		nil).(boocat.TemplateForm)
+	// Check the form
+	checkForm(t, bookForm, "book", "/save/book", 2)
+	// Get name field from the form
+	nameField := findTemplateField(t, bookForm.Fields, "year")
+	// Check name field
+	checkTemplateField(t, nameField, "year", "Year", "A year", "")
 
-	// @TODO Check validators somehow?
+	// @TODO Check returned validators?
 }
 
+// TestSaveNew tests boocat.SaveNew
 func TestSaveNew(t *testing.T) {
+	// Intialize database
 	db := initializedDB()
-	list := strki.SaveNew(context.TODO(), db, "author", "",
+
+	// Run SaveNew with a new author
+	list := boocat.SaveNew(context.TODO(), db, "author", "",
 		map[string]string{
 			"name":      "Miguel de Cervantes Saavedra",
 			"birthdate": "1547",
-		}).([]strki.TemplateRecord)
+		}).([]boocat.TemplateRecord)
 
+	// Check the number of records in the returned list data
 	if len(list) != 3 {
 		t.Errorf("expected 3 records but got %v", len(list))
 	}
+	// Find the record with the expected URL
 	record := findTemplateRecord(t, list, "/edit/author/"+db.LastID("author"))
+	// Check the record values
 	checkRecordValue(t, record, "name", "Miguel de Cervantes Saavedra")
 	checkRecordValue(t, record, "birthdate", "1547")
 }
 
+// Test EditExisting tests boocat.EditExisting
 func TestEditExisting(t *testing.T) {
+	// Initialize the database
 	db := initializedDB()
-	form := strki.EditExisting(context.TODO(), db, "book", db.LastID("book"),
-		nil).(strki.TemplateForm)
 
+	// Run EditExisting with the last book in the database
+	form := boocat.EditExisting(context.TODO(), db, "book", db.LastID("book"),
+		nil).(boocat.TemplateForm)
+	// Check the form
 	checkForm(t, form, "book", "/save/book/"+db.LastID("book"), 2)
+	// Get name field from the form
 	nameField := findTemplateField(t, form.Fields, "name")
-	checkFormatField(t, nameField, "name", "Name", "A-Z,a-z",
+	// Check name field
+	checkTemplateField(t, nameField, "name", "Name", "A-Z,a-z",
 		"Nineteen Eighty-Four")
-	// @TODO Check validators somehow?
+
+	// @TODO Check returned validators somehow?
 }
 
+// TestSaveExisting tests boocat.SaveExisting
 func TestSaveExisting(t *testing.T) {
+	// Initialize database
 	db := initializedDB()
-	records := strki.SaveExisting(context.TODO(), db, "author",
+
+	// Run SaveExisting with a new author
+	records := boocat.SaveExisting(context.TODO(), db, "author",
 		db.LastID("author"),
 		map[string]string{
 			"name":      "Simone de Beauvoir",
 			"birthdate": "1908",
-		}).([]strki.TemplateRecord)
+		}).([]boocat.TemplateRecord)
 
+	// Check the number of records in the returned list data
 	if len(records) != 2 {
 		t.Errorf("expected 2 records but got %v", len(records))
 	}
+	// Find the record with the expected URL
 	record := findTemplateRecord(t, records,
 		"/edit/author/"+db.LastID("author"))
+	// Check the record values
 	checkRecordValue(t, record, "name", "Simone de Beauvoir")
 	checkRecordValue(t, record, "birthdate", "1908")
 }
 
+// TestList tests boocat.List
 func TestList(t *testing.T) {
+	// Initialize database
 	db := initializedDB()
-	records := strki.List(context.TODO(), db, "book", "",
-		nil).([]strki.TemplateRecord)
 
+	// Run List for book format
+	records := boocat.List(context.TODO(), db, "book", "",
+		nil).([]boocat.TemplateRecord)
+
+	// Check the number of records in the returned list data
 	if len(records) != 4 {
 		t.Errorf("expected 4 records but got %v", len(records))
 	}
+	// Find one record with the expected URL
 	record1 := findTemplateRecord(t, records, "/edit/book/book1")
+	// Check the name field value
 	checkRecordValue(t, record1, "name", "Norwegian Wood")
+	// Find another record with the expected URL
 	record2 := findTemplateRecord(t, records, "/edit/book/book2")
+	// Check the year field value
 	checkRecordValue(t, record2, "year", "2002")
 }
 
-func checkForm(t *testing.T, form strki.TemplateForm, name, url string,
+// checkForm checks the values and number of fields of a TemplateForm
+func checkForm(t *testing.T, form boocat.TemplateForm, name, url string,
 	fields int) {
 
 	if form.Name != name {
@@ -132,8 +175,11 @@ func checkForm(t *testing.T, form strki.TemplateForm, name, url string,
 	}
 }
 
-func findTemplateField(t *testing.T, fields []strki.TemplateField,
-	name string) strki.TemplateField {
+// findTemplateField takes a field name and returns a TemplateField from a
+// slice with the same value. If the field couldn't be found then it fails and
+// stops the test.
+func findTemplateField(t *testing.T, fields []boocat.TemplateField,
+	name string) boocat.TemplateField {
 
 	for _, field := range fields {
 		if field.Name == name {
@@ -142,10 +188,11 @@ func findTemplateField(t *testing.T, fields []strki.TemplateField,
 	}
 
 	t.Fatalf("couldn't find field \"%v\"", name)
-	return strki.TemplateField{}
+	return boocat.TemplateField{}
 }
 
-func checkFormatField(t *testing.T, field strki.TemplateField, name, label,
+// checkTemplateField checks the values of a TemplateField
+func checkTemplateField(t *testing.T, field boocat.TemplateField, name, label,
 	description, value string) {
 
 	if field.Name != name {
@@ -166,8 +213,11 @@ func checkFormatField(t *testing.T, field strki.TemplateField, name, label,
 	}
 }
 
-func findTemplateRecord(t *testing.T, records []strki.TemplateRecord,
-	URL string) strki.TemplateRecord {
+// findTemplateRecord takes a record URL and returns a TemplateRecord from a
+// slice with the same value. If the record couldn't be found then it fails and
+// stops the test.
+func findTemplateRecord(t *testing.T, records []boocat.TemplateRecord,
+	URL string) boocat.TemplateRecord {
 
 	for _, record := range records {
 		if record.URL == URL {
@@ -176,10 +226,11 @@ func findTemplateRecord(t *testing.T, records []strki.TemplateRecord,
 	}
 
 	t.Fatalf("couldn't find record \"%v\"", URL)
-	return strki.TemplateRecord{}
+	return boocat.TemplateRecord{}
 }
 
-func checkRecordValue(t *testing.T, record strki.TemplateRecord, field,
+// checkRecordValue checks the value of a field of a TemplateRecord
+func checkRecordValue(t *testing.T, record boocat.TemplateRecord, field,
 	value string) {
 
 	if fieldValue, found := record.FieldValues[field]; !found {

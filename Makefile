@@ -6,7 +6,7 @@ debug:	### Debug Makefile itself
 
 .PHONY: build
 build:
-	go build -o strki ./cmd/main.go
+	go build -o boocat ./cmd/main.go
 
 .PHONY: run
 run:
