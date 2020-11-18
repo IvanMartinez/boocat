@@ -44,8 +44,14 @@ func TestEditNew(t *testing.T) {
 	db := initializedDB()
 
 	// Run EditNew for author format
-	authorForm := boocat.EditNew(context.TODO(), db, "author", "",
-		nil).(boocat.TemplateForm)
+	tplName, tplData := boocat.EditNew(context.TODO(), db, "author", "",
+		nil)
+	authorForm := tplData.(boocat.TemplateForm)
+
+	// Check the template
+	if tplName != "edit" {
+		t.Errorf("expected template \"edit\" but got \"%v\"", tplName)
+	}
 	// Check the form
 	checkForm(t, authorForm, "author", "/save/author", 2)
 	// Get birthdate field from the form
@@ -55,8 +61,14 @@ func TestEditNew(t *testing.T) {
 		"")
 
 	// Run EditNew for book format
-	bookForm := boocat.EditNew(context.TODO(), db, "book", "",
-		nil).(boocat.TemplateForm)
+	tplName, tplData = boocat.EditNew(context.TODO(), db, "book", "",
+		nil)
+	bookForm := tplData.(boocat.TemplateForm)
+
+	// Check the template
+	if tplName != "edit" {
+		t.Errorf("expected template \"edit\" but got \"%v\"", tplName)
+	}
 	// Check the form
 	checkForm(t, bookForm, "book", "/save/book", 2)
 	// Get name field from the form
@@ -73,18 +85,23 @@ func TestSaveNew(t *testing.T) {
 	db := initializedDB()
 
 	// Run SaveNew with a new author
-	list := boocat.SaveNew(context.TODO(), db, "author", "",
+	tplName, tplData := boocat.SaveNew(context.TODO(), db, "author", "",
 		map[string]string{
 			"name":      "Miguel de Cervantes Saavedra",
 			"birthdate": "1547",
-		}).([]boocat.TemplateRecord)
+		})
+	records := tplData.([]boocat.TemplateRecord)
 
-	// Check the number of records in the returned list data
-	if len(list) != 3 {
-		t.Errorf("expected 3 records but got %v", len(list))
+	// Check the template
+	if tplName != "list" {
+		t.Errorf("expected template \"list\" but got \"%v\"", tplName)
+	}
+	// Check the number of records
+	if len(records) != 3 {
+		t.Errorf("expected 3 records but got %v", len(records))
 	}
 	// Find the record with the expected URL
-	record := findTemplateRecord(t, list, "/edit/author/"+db.LastID("author"))
+	record := findTemplateRecord(t, records, "/edit/author/"+db.LastID("author"))
 	// Check the record values
 	checkRecordValue(t, record, "name", "Miguel de Cervantes Saavedra")
 	checkRecordValue(t, record, "birthdate", "1547")
@@ -96,8 +113,14 @@ func TestEditExisting(t *testing.T) {
 	db := initializedDB()
 
 	// Run EditExisting with the last book in the database
-	form := boocat.EditExisting(context.TODO(), db, "book", db.LastID("book"),
-		nil).(boocat.TemplateForm)
+	tplName, tplData := boocat.EditExisting(context.TODO(), db, "book", db.LastID("book"),
+		nil)
+	form := tplData.(boocat.TemplateForm)
+
+	// Check the template
+	if tplName != "edit" {
+		t.Errorf("expected template \"edit\" but got \"%v\"", tplName)
+	}
 	// Check the form
 	checkForm(t, form, "book", "/save/book/"+db.LastID("book"), 2)
 	// Get name field from the form
@@ -115,14 +138,19 @@ func TestSaveExisting(t *testing.T) {
 	db := initializedDB()
 
 	// Run SaveExisting with a new author
-	records := boocat.SaveExisting(context.TODO(), db, "author",
+	tplName, tplData := boocat.SaveExisting(context.TODO(), db, "author",
 		db.LastID("author"),
 		map[string]string{
 			"name":      "Simone de Beauvoir",
 			"birthdate": "1908",
-		}).([]boocat.TemplateRecord)
+		})
+	records := tplData.([]boocat.TemplateRecord)
 
-	// Check the number of records in the returned list data
+	// Check the template
+	if tplName != "list" {
+		t.Errorf("expected template \"list\" but got \"%v\"", tplName)
+	}
+	// Check the number of records
 	if len(records) != 2 {
 		t.Errorf("expected 2 records but got %v", len(records))
 	}
@@ -140,9 +168,14 @@ func TestList(t *testing.T) {
 	db := initializedDB()
 
 	// Run List for book format
-	records := boocat.List(context.TODO(), db, "book", "",
-		nil).([]boocat.TemplateRecord)
+	tplName, tplData := boocat.List(context.TODO(), db, "book", "",
+		nil)
+	records := tplData.([]boocat.TemplateRecord)
 
+	// Check the template
+	if tplName != "list" {
+		t.Errorf("expected template \"list\" but got \"%v\"", tplName)
+	}
 	// Check the number of records in the returned list data
 	if len(records) != 4 {
 		t.Errorf("expected 4 records but got %v", len(records))

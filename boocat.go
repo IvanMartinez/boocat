@@ -10,18 +10,18 @@ import (
 
 // TemplateForm contains the data to generate a form with a HTML template
 type TemplateForm struct {
-	Name      string
-	Fields    []TemplateField
-	SubmitURL template.URL
+	Name      string          // ID
+	Fields    []TemplateField // Fields
+	SubmitURL template.URL    // Submit URL
 }
 
 // TemplateField contains the data to generate a field of a form with
 // a HTML template
 type TemplateField struct {
-	Name        string
-	Label       string
-	Description string
-	Value       string
+	Name        string // ID
+	Label       string // Display name
+	Description string // Description
+	Value       string // Value
 }
 
 // TemplateRecord contains the data to show a record (author, book...) with
@@ -37,11 +37,12 @@ var HTTPURL string
 
 // EditNew returns the data to generate a HTML form based on the format
 func EditNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
-	_submittedValues map[string]string) interface{} {
+	_submittedValues map[string]string) (string, interface{}) {
 
 	format, err := db.GetFormat(ctx, pFormat)
 	if err != nil {
-		return nil
+		log.Printf("couldn't get format \"%v\": %v\n", pFormat, err)
+		return "", nil
 	}
 
 	tData := TemplateForm{
@@ -49,35 +50,38 @@ func EditNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 		Fields:    fieldsWithValue(format, nil),
 		SubmitURL: template.URL(HTTPURL + "/save/" + pFormat),
 	}
-	return tData
+	return "edit", tData
 }
 
 // SaveNew saves (creates) a new record (author, book, etc)
 func SaveNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
-	submittedValues map[string]string) interface{} {
+	submittedValues map[string]string) (string, interface{}) {
 
 	// @TODO: Validate values
 	if err := db.AddRecord(ctx, pFormat, submittedValues); err != nil {
 		log.Printf("error adding record to database: %v\n", err)
 	}
-	return List(ctx, db, pFormat, "", submittedValues)
+	tplName, tplData := List(ctx, db, pFormat, "", submittedValues)
+	return tplName, tplData
 }
 
 // EditNew returns the data to generate a HTML form based on the format.
 // It also returns the values of a record (author, book...) to pre-fill the
 // form.
 func EditExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
-	_submittedValues map[string]string) interface{} {
+	_submittedValues map[string]string) (string, interface{}) {
 
 	format, err := db.GetFormat(ctx, pFormat)
 	if err != nil {
-		return nil
+		log.Printf("couldn't get format \"%v\": %v\n", pFormat, err)
+		return "", nil
 	}
 
 	record, err := db.GetRecord(ctx, pFormat, pRecord)
 	if err != nil {
 		log.Printf("error getting database record: %v\n", err)
-		return EditNew(ctx, db, pFormat, pRecord, nil)
+		tplName, tplData := EditNew(ctx, db, pFormat, pRecord, nil)
+		return tplName, tplData
 	}
 
 	tData := TemplateForm{
@@ -86,12 +90,12 @@ func EditExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 		SubmitURL: template.URL(
 			HTTPURL + "/save/" + pFormat + "/" + record.DbID),
 	}
-	return tData
+	return "edit", tData
 }
 
 // SaveNew saves (updates) a existing record (author, book...)
 func SaveExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
-	submittedValues map[string]string) interface{} {
+	submittedValues map[string]string) (string, interface{}) {
 
 	record := database.Record{
 		DbID:        pRecord,
@@ -100,21 +104,22 @@ func SaveExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 	if err := db.UpdateRecord(ctx, pFormat, record); err != nil {
 		log.Printf("error updating record in database: %v\n", err)
 	}
-	return List(ctx, db, pFormat, "", submittedValues)
+	tplName, tplData := List(ctx, db, pFormat, "", submittedValues)
+	return tplName, tplData
 }
 
 // List returns the data to generate a HTML list of records (authors, books...)
 func List(ctx context.Context, db database.DB, pFormat, _pRecord string,
-	_submittedValues map[string]string) interface{} {
+	_submittedValues map[string]string) (string, interface{}) {
 
 	records, err := db.GetAllRecords(ctx, pFormat)
 	if err != nil {
 		log.Printf("error getting records from database: %v\n", err)
-		return nil
+		return "", nil
 	}
 
 	tData := templateRecords(records, HTTPURL+"/edit/"+pFormat+"/")
-	return tData
+	return "list", tData
 }
 
 // fieldsWithValue takes a format and a returns a slice of TemplateField to

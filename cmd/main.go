@@ -51,15 +51,15 @@ func startHTTPServer(ctx context.Context, db database.DB, url string) {
 	router := mux.NewRouter()
 	// Register handle functions
 	router.HandleFunc("/edit/{pFormat}",
-		makeHandler(boocat.EditNew, db, "edit"))
+		makeHandler(boocat.EditNew, db))
 	router.HandleFunc("/edit/{pFormat}/{pRecord}",
-		makeHandler(boocat.EditExisting, db, "edit"))
+		makeHandler(boocat.EditExisting, db))
 	router.HandleFunc("/save/{pFormat}",
-		makeHandler(boocat.SaveNew, db, "list"))
+		makeHandler(boocat.SaveNew, db))
 	router.HandleFunc("/save/{pFormat}/{pRecord}",
-		makeHandler(boocat.SaveExisting, db, "list"))
+		makeHandler(boocat.SaveExisting, db))
 	router.HandleFunc("/list/{pFormat}",
-		makeHandler(boocat.List, db, "list"))
+		makeHandler(boocat.List, db))
 
 	// Start the HTTP server in a new goroutine
 	srv := &http.Server{
@@ -93,17 +93,9 @@ func startHTTPServer(ctx context.Context, db database.DB, url string) {
 // parameter. This reduces boilerplate since common handler operations are
 // implemented here.
 func makeHandler(tplHandler func(context.Context, database.DB, string, string,
-	map[string]string) interface{}, db database.DB,
-	tplName string) http.HandlerFunc {
+	map[string]string) (string, interface{}), db database.DB) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Get the template to generate the output
-		tpl, found := templates.Get(tplName)
-		if !found {
-			log.Fatalf("Couldn't find template %v", tplName)
-			http.NotFound(w, r)
-		}
-
 		// Read the path variables and submitted form values
 		vars := mux.Vars(r)
 		pFormat := vars["pFormat"]
@@ -111,16 +103,20 @@ func makeHandler(tplHandler func(context.Context, database.DB, string, string,
 		submittedValues := submittedFormValues(r)
 
 		// Perform the specific operation for the route
-		if tData := tplHandler(r.Context(), db, pFormat, pRecord,
-			submittedValues); tData != nil {
+		tplName, tplData := tplHandler(r.Context(), db, pFormat, pRecord,
+			submittedValues)
 
+		// Get the template to generate the output
+		tpl, found := templates.Get(tplName)
+		if found {
 			// Generate the output with the template and the result of the
 			// operation
-			err := tpl.Execute(w, tData)
+			err := tpl.Execute(w, tplData)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 		} else {
+			log.Printf("couldn't find template \"%v\"", tplName)
 			http.NotFound(w, r)
 		}
 	}
