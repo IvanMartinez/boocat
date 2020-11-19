@@ -50,15 +50,17 @@ func startHTTPServer(ctx context.Context, db database.DB, url string) {
 	// Gorilla mux router allows us to use patterns in paths
 	router := mux.NewRouter()
 	// Register handle functions
-	router.HandleFunc("/edit/{pFormat}",
+	router.HandleFunc("/{pFormat}/edit",
 		makeHandler(boocat.EditNew, db))
-	router.HandleFunc("/edit/{pFormat}/{pRecord}",
+	router.HandleFunc("/{pFormat}/{pRecord}/edit",
 		makeHandler(boocat.EditExisting, db))
-	router.HandleFunc("/save/{pFormat}",
+	router.HandleFunc("/{pFormat}/save",
 		makeHandler(boocat.SaveNew, db))
-	router.HandleFunc("/save/{pFormat}/{pRecord}",
+	router.HandleFunc("/{pFormat}/{pRecord}/save",
 		makeHandler(boocat.SaveExisting, db))
-	router.HandleFunc("/list/{pFormat}",
+	router.HandleFunc("/{pFormat}/{pRecord}",
+		makeHandler(boocat.View, db))
+	router.HandleFunc("/{pFormat}",
 		makeHandler(boocat.List, db))
 
 	// Start the HTTP server in a new goroutine

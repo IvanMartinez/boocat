@@ -45,11 +45,11 @@ func NewDB() (db *MockDB) {
 // AddRecord adds a new record (author, book...) with the given field values to
 // the database
 func (db *MockDB) AddRecord(ctx context.Context, format string,
-	values map[string]string) error {
+	values map[string]string) (string, error) {
 
 	rSet, found := db.recordSets[format]
 	if !found {
-		return fmt.Errorf("unknown format %v", format)
+		return "", fmt.Errorf("unknown format %v", format)
 	}
 
 	ID := rSet.nextID()
@@ -58,7 +58,7 @@ func (db *MockDB) AddRecord(ctx context.Context, format string,
 		FieldValues: values,
 	}
 
-	return nil
+	return ID, nil
 }
 
 // Update updates a database record (author, book...) with the given

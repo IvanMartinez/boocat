@@ -18,10 +18,11 @@ type TemplateForm struct {
 // TemplateField contains the data to generate a field of a form with
 // a HTML template
 type TemplateField struct {
-	Name        string // ID
-	Label       string // Display name
-	Description string // Description
-	Value       string // Value
+	Name             string // ID
+	Label            string // Display name
+	Description      string // Description
+	Value            string // Value
+	FailedValidation string // Whether the value failed validation
 }
 
 // TemplateRecord contains the data to show a record (author, book...) with
@@ -48,7 +49,7 @@ func EditNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 	tData := TemplateForm{
 		Name:      format.Name,
 		Fields:    fieldsWithValue(format, nil),
-		SubmitURL: template.URL(HTTPURL + "/save/" + pFormat),
+		SubmitURL: template.URL(HTTPURL + "/" + pFormat + "/save"),
 	}
 	return "edit", tData
 }
@@ -58,11 +59,16 @@ func SaveNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 	submittedValues map[string]string) (string, interface{}) {
 
 	// @TODO: Validate values
-	if err := db.AddRecord(ctx, pFormat, submittedValues); err != nil {
+	dbID, err := db.AddRecord(ctx, pFormat, submittedValues)
+	if err != nil {
 		log.Printf("error adding record to database: %v\n", err)
 	}
-	tplName, tplData := List(ctx, db, pFormat, "", submittedValues)
-	return tplName, tplData
+
+	templateRecord := TemplateRecord{
+		URL:         HTTPURL + "/" + pFormat + "/" + dbID,
+		FieldValues: submittedValues,
+	}
+	return "view", templateRecord
 }
 
 // EditNew returns the data to generate a HTML form based on the format.
@@ -88,12 +94,12 @@ func EditExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 		Name:   format.Name,
 		Fields: fieldsWithValue(format, record),
 		SubmitURL: template.URL(
-			HTTPURL + "/save/" + pFormat + "/" + record.DbID),
+			HTTPURL + "/" + pFormat + "/" + record.DbID + "/save"),
 	}
 	return "edit", tData
 }
 
-// SaveNew saves (updates) a existing record (author, book...)
+// SaveExisting saves (updates) a existing record (author, book...)
 func SaveExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 	submittedValues map[string]string) (string, interface{}) {
 
@@ -104,8 +110,35 @@ func SaveExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 	if err := db.UpdateRecord(ctx, pFormat, record); err != nil {
 		log.Printf("error updating record in database: %v\n", err)
 	}
-	tplName, tplData := List(ctx, db, pFormat, "", submittedValues)
-	return tplName, tplData
+
+	templateRecord := TemplateRecord{
+		URL:         HTTPURL + "/" + pFormat + "/" + pRecord,
+		FieldValues: submittedValues,
+	}
+	return "view", templateRecord
+}
+
+func View(ctx context.Context, db database.DB, pFormat, pRecord string,
+	_submittedValues map[string]string) (string, interface{}) {
+
+	format, err := db.GetFormat(ctx, pFormat)
+	if err != nil {
+		log.Printf("couldn't get format \"%v\": %v\n", pFormat, err)
+		return "", nil
+	}
+
+	record, err := db.GetRecord(ctx, pFormat, pRecord)
+	if err != nil {
+		log.Printf("error getting database record: %v\n", err)
+		tplName, tplData := EditNew(ctx, db, pFormat, pRecord, nil)
+		return tplName, tplData
+	}
+
+	tData := TemplateRecord{
+		URL:         HTTPURL + "/" + pFormat + "/" + pRecord,
+		FieldValues: labelValues(format, record),
+	}
+	return "view", tData
 }
 
 // List returns the data to generate a HTML list of records (authors, books...)
@@ -118,7 +151,7 @@ func List(ctx context.Context, db database.DB, pFormat, _pRecord string,
 		return "", nil
 	}
 
-	tData := templateRecords(records, HTTPURL+"/edit/"+pFormat+"/")
+	tData := templateRecords(records, HTTPURL+"/"+pFormat+"/")
 	return "list", tData
 }
 
@@ -139,6 +172,16 @@ func fieldsWithValue(format *database.Format,
 		}
 	}
 	return fieldsWithValue
+}
+
+func labelValues(format *database.Format,
+	record *database.Record) map[string]string {
+
+	labelValues := make(map[string]string)
+	for _, field := range format.Fields {
+		labelValues[field.Label] = record.FieldValues[field.Name]
+	}
+	return labelValues
 }
 
 // templateRecords takes a slice of records (authors, books...) and returns

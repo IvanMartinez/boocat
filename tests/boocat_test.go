@@ -54,7 +54,7 @@ func TestEditNew(t *testing.T) {
 		t.Errorf("expected template \"edit\" but got \"%v\"", tplName)
 	}
 	// Check the form
-	if err := checkForm(authorForm, "author", "/save/author", 2); err != nil {
+	if err := checkForm(authorForm, "author", "/author/save", 2); err != nil {
 		t.Error(err)
 	}
 	// Check birthdate field
@@ -74,7 +74,7 @@ func TestEditNew(t *testing.T) {
 		t.Errorf("expected template \"edit\" but got \"%v\"", tplName)
 	}
 	// Check the form
-	if err := checkForm(bookForm, "book", "/save/book", 2); err != nil {
+	if err := checkForm(bookForm, "book", "/book/save", 2); err != nil {
 
 		t.Error(err)
 	}
@@ -99,19 +99,15 @@ func TestSaveNew(t *testing.T) {
 			"name":      "Miguel de Cervantes Saavedra",
 			"birthdate": "1547",
 		})
-	records := tplData.([]boocat.TemplateRecord)
+	record := tplData.(boocat.TemplateRecord)
 
 	// Check the template
-	if tplName != "list" {
-		t.Errorf("expected template \"list\" but got \"%v\"", tplName)
+	if tplName != "view" {
+		t.Errorf("expected template \"view\" but got \"%v\"", tplName)
 	}
-	// Check the number of records
-	if len(records) != 3 {
-		t.Errorf("expected 3 records but got %v", len(records))
-	}
-	// Find the record with the expected URL
-	if err := findCheckTemplateRecord(records,
-		"/edit/author/"+db.LastID("author"),
+	// Check the record
+	if err := checkTemplateRecord(record,
+		"/author/"+db.LastID("author"),
 		map[string]string{
 			"name":      "Miguel de Cervantes Saavedra",
 			"birthdate": "1547",
@@ -136,7 +132,7 @@ func TestEditExisting(t *testing.T) {
 		t.Errorf("expected template \"edit\" but got \"%v\"", tplName)
 	}
 	// Check the form
-	if err := checkForm(form, "book", "/save/book/"+db.LastID("book"),
+	if err := checkForm(form, "book", "/book/"+db.LastID("book")+"/save",
 		2); err != nil {
 
 		t.Error(err)
@@ -163,22 +159,43 @@ func TestSaveExisting(t *testing.T) {
 			"name":      "Simone de Beauvoir",
 			"birthdate": "1908",
 		})
-	records := tplData.([]boocat.TemplateRecord)
+	record := tplData.(boocat.TemplateRecord)
 
 	// Check the template
-	if tplName != "list" {
-		t.Errorf("expected template \"list\" but got \"%v\"", tplName)
-	}
-	// Check the number of records
-	if len(records) != 2 {
-		t.Errorf("expected 2 records but got %v", len(records))
+	if tplName != "view" {
+		t.Errorf("expected template \"view\" but got \"%v\"", tplName)
 	}
 	// Find the record with the expected URL
-	if err := findCheckTemplateRecord(records,
-		"/edit/author/"+db.LastID("author"),
+	if err := checkTemplateRecord(record,
+		"/author/"+db.LastID("author"),
 		map[string]string{
 			"name":      "Simone de Beauvoir",
 			"birthdate": "1908",
+		}); err != nil {
+
+		t.Error(err)
+	}
+}
+
+// TestView tests boocat.View
+func TestView(t *testing.T) {
+	// Initialize the database
+	db := initializedDB()
+
+	// Run View with the last author in the database
+	tplName, tplData := boocat.View(context.TODO(), db, "author",
+		db.LastID("author"), nil)
+	record := tplData.(boocat.TemplateRecord)
+
+	// Check the template
+	if tplName != "view" {
+		t.Errorf("expected template \"view\" but got \"%v\"", tplName)
+	}
+	// Check the record
+	if err := checkTemplateRecord(record, "/author/author2",
+		map[string]string{
+			"Name":          "George Orwell",
+			"Year of birth": "1903",
 		}); err != nil {
 
 		t.Error(err)
@@ -204,7 +221,7 @@ func TestList(t *testing.T) {
 		t.Errorf("expected 4 records but got %v", len(records))
 	}
 	// Find one record with the expected URL
-	if err := findCheckTemplateRecord(records, "/edit/book/book1",
+	if err := findCheckTemplateRecord(records, "/book/book1",
 		map[string]string{
 			"name": "Norwegian Wood",
 			"year": "1987",
@@ -214,7 +231,7 @@ func TestList(t *testing.T) {
 	}
 
 	// Find another record with the expected URL
-	if err := findCheckTemplateRecord(records, "/edit/book/book2",
+	if err := findCheckTemplateRecord(records, "/book/book2",
 		map[string]string{
 			"name": "Kafka On The Shore",
 			"year": "2002",
@@ -296,6 +313,18 @@ func findTemplateRecord(records []boocat.TemplateRecord,
 	}
 
 	return nil
+}
+
+// checkTemplateRecord checks the URL and fields of a TemplateRecord
+func checkTemplateRecord(record boocat.TemplateRecord, url string,
+	expectedValues map[string]string) error {
+
+	if record.URL != url {
+		return fmt.Errorf("unexpected URL \"%v\" should be \"%v\"",
+			record.URL, url)
+	}
+
+	return checkFieldValues(record.FieldValues, expectedValues)
 }
 
 // checkFieldValues compares two maps of field-value pairs

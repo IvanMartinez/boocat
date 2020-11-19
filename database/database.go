@@ -43,7 +43,7 @@ type FormatField struct {
 // DB is the database interface
 type DB interface {
 	AddRecord(ctx context.Context, format string,
-		fields map[string]string) error
+		fields map[string]string) (string, error)
 	UpdateRecord(ctx context.Context, format string, record Record) error
 	GetAllRecords(ctx context.Context, format string) ([]Record, error)
 	GetRecord(ctx context.Context, format, id string) (*Record, error)
@@ -95,16 +95,19 @@ func (db *MongoDB) Disconnect(ctx context.Context) {
 // AddRecord adds a new record (author, book...) with the given field values to
 // the database
 func (db *MongoDB) AddRecord(ctx context.Context, format string,
-	values map[string]string) error {
+	values map[string]string) (string, error) {
 
 	// If there is a collection for the format
 	if col, found := db.collections[format]; found {
 		// Insert the record
-		_, err := col.InsertOne(ctx, values)
-		return err
+		if res, err := col.InsertOne(ctx, values); err == nil {
+			return res.InsertedID.(primitive.ObjectID).Hex(), err
+		} else {
+			return "", err
+		}
 	}
 
-	return errors.New("format not found")
+	return "", errors.New("format not found")
 }
 
 // Update updates a database record (author, book...) with the given
