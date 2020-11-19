@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"fmt"
 	"html/template"
 	"testing"
 
@@ -53,12 +54,15 @@ func TestEditNew(t *testing.T) {
 		t.Errorf("expected template \"edit\" but got \"%v\"", tplName)
 	}
 	// Check the form
-	checkForm(t, authorForm, "author", "/save/author", 2)
-	// Get birthdate field from the form
-	birthField := findTemplateField(t, authorForm.Fields, "birthdate")
+	if err := checkForm(authorForm, "author", "/save/author", 2); err != nil {
+		t.Error(err)
+	}
 	// Check birthdate field
-	checkTemplateField(t, birthField, "birthdate", "Year of birth", "A year",
-		"")
+	if err := checkTemplateField(authorForm.Fields, "birthdate",
+		"Year of birth", "A year", ""); err != nil {
+
+		t.Error(err)
+	}
 
 	// Run EditNew for book format
 	tplName, tplData = boocat.EditNew(context.TODO(), db, "book", "",
@@ -70,11 +74,16 @@ func TestEditNew(t *testing.T) {
 		t.Errorf("expected template \"edit\" but got \"%v\"", tplName)
 	}
 	// Check the form
-	checkForm(t, bookForm, "book", "/save/book", 2)
-	// Get name field from the form
-	nameField := findTemplateField(t, bookForm.Fields, "year")
-	// Check name field
-	checkTemplateField(t, nameField, "year", "Year", "A year", "")
+	if err := checkForm(bookForm, "book", "/save/book", 2); err != nil {
+
+		t.Error(err)
+	}
+	// Check year field
+	if err := checkTemplateField(bookForm.Fields, "year", "Year", "A year",
+		""); err != nil {
+
+		t.Error(err)
+	}
 
 	// @TODO Check returned validators?
 }
@@ -101,20 +110,25 @@ func TestSaveNew(t *testing.T) {
 		t.Errorf("expected 3 records but got %v", len(records))
 	}
 	// Find the record with the expected URL
-	record := findTemplateRecord(t, records, "/edit/author/"+db.LastID("author"))
-	// Check the record values
-	checkRecordValue(t, record, "name", "Miguel de Cervantes Saavedra")
-	checkRecordValue(t, record, "birthdate", "1547")
+	if err := findCheckTemplateRecord(records,
+		"/edit/author/"+db.LastID("author"),
+		map[string]string{
+			"name":      "Miguel de Cervantes Saavedra",
+			"birthdate": "1547",
+		}); err != nil {
+
+		t.Error(err)
+	}
 }
 
-// Test EditExisting tests boocat.EditExisting
+// TestEditExisting tests boocat.EditExisting
 func TestEditExisting(t *testing.T) {
 	// Initialize the database
 	db := initializedDB()
 
 	// Run EditExisting with the last book in the database
-	tplName, tplData := boocat.EditExisting(context.TODO(), db, "book", db.LastID("book"),
-		nil)
+	tplName, tplData := boocat.EditExisting(context.TODO(), db, "book",
+		db.LastID("book"), nil)
 	form := tplData.(boocat.TemplateForm)
 
 	// Check the template
@@ -122,12 +136,17 @@ func TestEditExisting(t *testing.T) {
 		t.Errorf("expected template \"edit\" but got \"%v\"", tplName)
 	}
 	// Check the form
-	checkForm(t, form, "book", "/save/book/"+db.LastID("book"), 2)
-	// Get name field from the form
-	nameField := findTemplateField(t, form.Fields, "name")
+	if err := checkForm(form, "book", "/save/book/"+db.LastID("book"),
+		2); err != nil {
+
+		t.Error(err)
+	}
 	// Check name field
-	checkTemplateField(t, nameField, "name", "Name", "A-Z,a-z",
-		"Nineteen Eighty-Four")
+	if err := checkTemplateField(form.Fields, "name", "Name", "A-Z,a-z",
+		"Nineteen Eighty-Four"); err != nil {
+
+		t.Error(err)
+	}
 
 	// @TODO Check returned validators somehow?
 }
@@ -155,11 +174,15 @@ func TestSaveExisting(t *testing.T) {
 		t.Errorf("expected 2 records but got %v", len(records))
 	}
 	// Find the record with the expected URL
-	record := findTemplateRecord(t, records,
-		"/edit/author/"+db.LastID("author"))
-	// Check the record values
-	checkRecordValue(t, record, "name", "Simone de Beauvoir")
-	checkRecordValue(t, record, "birthdate", "1908")
+	if err := findCheckTemplateRecord(records,
+		"/edit/author/"+db.LastID("author"),
+		map[string]string{
+			"name":      "Simone de Beauvoir",
+			"birthdate": "1908",
+		}); err != nil {
+
+		t.Error(err)
+	}
 }
 
 // TestList tests boocat.List
@@ -181,95 +204,118 @@ func TestList(t *testing.T) {
 		t.Errorf("expected 4 records but got %v", len(records))
 	}
 	// Find one record with the expected URL
-	record1 := findTemplateRecord(t, records, "/edit/book/book1")
-	// Check the name field value
-	checkRecordValue(t, record1, "name", "Norwegian Wood")
+	if err := findCheckTemplateRecord(records, "/edit/book/book1",
+		map[string]string{
+			"name": "Norwegian Wood",
+			"year": "1987",
+		}); err != nil {
+
+		t.Error(err)
+	}
+
 	// Find another record with the expected URL
-	record2 := findTemplateRecord(t, records, "/edit/book/book2")
-	// Check the year field value
-	checkRecordValue(t, record2, "year", "2002")
+	if err := findCheckTemplateRecord(records, "/edit/book/book2",
+		map[string]string{
+			"name": "Kafka On The Shore",
+			"year": "2002",
+		}); err != nil {
+
+		t.Error(err)
+	}
 }
 
 // checkForm checks the values and number of fields of a TemplateForm
-func checkForm(t *testing.T, form boocat.TemplateForm, name, url string,
-	fields int) {
+func checkForm(form boocat.TemplateForm, name, url string,
+	fields int) error {
 
 	if form.Name != name {
-		t.Errorf("unexpected form name \"%v\" should be \"%v\"",
+		return fmt.Errorf("unexpected form name \"%v\" should be \"%v\"",
 			form.Name, name)
 	}
 	if form.SubmitURL != template.URL(url) {
-		t.Errorf("unexpected form submit URL \"%v\" should be \"%v\"",
+		return fmt.Errorf("unexpected form submit URL \"%v\" should be \"%v\"",
 			form.SubmitURL, url)
 	}
 	if len(form.Fields) != fields {
-		t.Errorf("unexpected number of fields %v should be %v",
+		return fmt.Errorf("unexpected number of fields %v should be %v",
 			len(form.Fields), fields)
 	}
-}
 
-// findTemplateField takes a field name and returns a TemplateField from a
-// slice with the same value. If the field couldn't be found then it fails and
-// stops the test.
-func findTemplateField(t *testing.T, fields []boocat.TemplateField,
-	name string) boocat.TemplateField {
-
-	for _, field := range fields {
-		if field.Name == name {
-			return field
-		}
-	}
-
-	t.Fatalf("couldn't find field \"%v\"", name)
-	return boocat.TemplateField{}
+	return nil
 }
 
 // checkTemplateField checks the values of a TemplateField
-func checkTemplateField(t *testing.T, field boocat.TemplateField, name, label,
-	description, value string) {
+func checkTemplateField(fields []boocat.TemplateField, name,
+	label, description, value string) error {
 
-	if field.Name != name {
-		t.Errorf("unexpected field name \"%v\" should be \"%v\"", field.Name,
-			name)
-	}
-	if field.Label != label {
-		t.Errorf("unexpected field label \"%v\" should be \"%v\"", field.Label,
-			label)
-	}
-	if field.Description != description {
-		t.Errorf("unexpected field description \"%v\" should be \"%v\"",
-			field.Description, description)
-	}
-	if field.Value != value {
-		t.Errorf("unexpected field value \"%v\" should be \"%v\"", field.Value,
-			value)
-	}
-}
+	for _, field := range fields {
+		if field.Name == name {
+			if field.Label != label {
+				return fmt.Errorf(
+					"unexpected field label \"%v\" should be \"%v\"",
+					field.Label, label)
+			}
+			if field.Description != description {
+				return fmt.Errorf(
+					"unexpected field description \"%v\" should be \"%v\"",
+					field.Description, description)
+			}
+			if field.Value != value {
+				return fmt.Errorf(
+					"unexpected field value \"%v\" should be \"%v\"",
+					field.Value, value)
+			}
 
-// findTemplateRecord takes a record URL and returns a TemplateRecord from a
-// slice with the same value. If the record couldn't be found then it fails and
-// stops the test.
-func findTemplateRecord(t *testing.T, records []boocat.TemplateRecord,
-	URL string) boocat.TemplateRecord {
-
-	for _, record := range records {
-		if record.URL == URL {
-			return record
+			return nil
 		}
 	}
 
-	t.Fatalf("couldn't find record \"%v\"", URL)
-	return boocat.TemplateRecord{}
+	return fmt.Errorf("couldn't find field \"%v\"", name)
 }
 
-// checkRecordValue checks the value of a field of a TemplateRecord
-func checkRecordValue(t *testing.T, record boocat.TemplateRecord, field,
-	value string) {
+// findCheckTemplateRecord looks for a record with the given URL in a slice,
+// and then checks the values of its fields
+func findCheckTemplateRecord(records []boocat.TemplateRecord, URL string,
+	expectedValues map[string]string) error {
 
-	if fieldValue, found := record.FieldValues[field]; !found {
-		t.Errorf("field \"%v\" not found", field)
-	} else if fieldValue != value {
-		t.Errorf("field \"%v\" should be \"%v\" but is \"%v\"",
-			field, value, fieldValue)
+	if record := findTemplateRecord(records, URL); record != nil {
+		return checkFieldValues(record.FieldValues, expectedValues)
 	}
+
+	return fmt.Errorf("couldn't find record with URL \"%v\"", URL)
+}
+
+// findTemplateRecord looks for a record with the given URL in a slice
+func findTemplateRecord(records []boocat.TemplateRecord,
+	URL string) *boocat.TemplateRecord {
+
+	for _, record := range records {
+		if record.URL == URL {
+			return &record
+		}
+	}
+
+	return nil
+}
+
+// checkFieldValues compares two maps of field-value pairs
+func checkFieldValues(values, expectedValues map[string]string) error {
+	if len(values) != len(expectedValues) {
+		return fmt.Errorf("expected %v fields but got %v", len(expectedValues),
+			len(values))
+	}
+
+	for name, value := range values {
+		if expectedValue, found := expectedValues[name]; found {
+			if value != expectedValue {
+				return fmt.Errorf(
+					"unexpected field \"%v\" value \"%v\" should be \"%v\"",
+					name, value, expectedValue)
+			}
+		} else {
+			return fmt.Errorf("unexpected field \"%v\"", name)
+		}
+	}
+
+	return nil
 }
