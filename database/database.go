@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	dbName = "strki"
+	dbName = "boocat"
 )
 
 // Record represents the data of an entity, currently author or book
@@ -181,14 +181,14 @@ func (db *MongoDB) GetRecord(ctx context.Context, format,
 // GetFormat returns a format
 func (db *MongoDB) GetFormat(ctx context.Context, id string) (*Format, error) {
 	if id == "author" {
-		nameRegExp, _ := regexp.Compile("([A-Z][a-z]* )*([A-Z][a-z]*)")
+		nameRegExp, _ := regexp.Compile("^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
 		nameField := FormatField{
 			Name:        "name",
 			Label:       "Name",
 			Description: "A-Z,a-z",
 			Validator:   nameRegExp,
 		}
-		birthdateRegExp, _ := regexp.Compile("[1|2][0-9]{3}")
+		birthdateRegExp, _ := regexp.Compile("^[1|2][0-9]{3}$")
 		birthdateField := FormatField{
 			Name:        "birthdate",
 			Label:       "Year of birth",
@@ -202,14 +202,14 @@ func (db *MongoDB) GetFormat(ctx context.Context, id string) (*Format, error) {
 		}, nil
 
 	} else if id == "book" {
-		nameRegExp, _ := regexp.Compile("([A-Z][a-z]* )*([A-Z][a-z]*)")
+		nameRegExp, _ := regexp.Compile("^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
 		nameField := FormatField{
 			Name:        "name",
 			Label:       "Name",
 			Description: "A-Z,a-z",
 			Validator:   nameRegExp,
 		}
-		yearRegExp, _ := regexp.Compile("[1|2][0-9]{3}")
+		yearRegExp, _ := regexp.Compile("^[1|2][0-9]{3}$")
 		yearField := FormatField{
 			Name:        "year",
 			Label:       "Year",

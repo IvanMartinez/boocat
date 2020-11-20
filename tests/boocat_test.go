@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"html/template"
 	"testing"
@@ -19,6 +20,10 @@ func initializedDB() (db *MockDB) {
 	db.AddRecord(context.TODO(), "author", map[string]string{
 		"name":      "George Orwell",
 		"birthdate": "1903",
+	})
+	db.AddRecord(context.TODO(), "author", map[string]string{
+		"name":      "miguel de cervantes saavedra",
+		"birthdate": "MDXLVII",
 	})
 	db.AddRecord(context.TODO(), "book", map[string]string{
 		"name": "Norwegian Wood",
@@ -47,57 +52,34 @@ func TestEditNew(t *testing.T) {
 	// Run EditNew for author format
 	tplName, tplData := boocat.EditNew(context.TODO(), db, "author", "",
 		nil)
-	authorForm := tplData.(boocat.TemplateForm)
+	form := tplData.(boocat.TemplateForm)
 
 	// Check the template
 	if tplName != "edit" {
 		t.Errorf("expected template \"edit\" but got \"%v\"", tplName)
 	}
 	// Check the form
-	if err := checkForm(authorForm, "author", "/author/save", 2); err != nil {
+	if err := checkForm(form, "author", "/author/save", 2); err != nil {
 		t.Error(err)
 	}
 	// Check birthdate field
-	if err := checkTemplateField(authorForm.Fields, "birthdate",
-		"Year of birth", "A year", ""); err != nil {
+	if err := checkTemplateField(form.Fields, "birthdate",
+		"Year of birth", "A year", "", false); err != nil {
 
 		t.Error(err)
 	}
-
-	// Run EditNew for book format
-	tplName, tplData = boocat.EditNew(context.TODO(), db, "book", "",
-		nil)
-	bookForm := tplData.(boocat.TemplateForm)
-
-	// Check the template
-	if tplName != "edit" {
-		t.Errorf("expected template \"edit\" but got \"%v\"", tplName)
-	}
-	// Check the form
-	if err := checkForm(bookForm, "book", "/book/save", 2); err != nil {
-
-		t.Error(err)
-	}
-	// Check year field
-	if err := checkTemplateField(bookForm.Fields, "year", "Year", "A year",
-		""); err != nil {
-
-		t.Error(err)
-	}
-
-	// @TODO Check returned validators?
 }
 
-// TestSaveNew tests boocat.SaveNew
+// TestSaveNew tests boocat.SaveNew when validation succeeds
 func TestSaveNew(t *testing.T) {
 	// Intialize database
 	db := initializedDB()
 
-	// Run SaveNew with a new author
-	tplName, tplData := boocat.SaveNew(context.TODO(), db, "author", "",
+	// Run SaveNew with a new book
+	tplName, tplData := boocat.SaveNew(context.TODO(), db, "book", "",
 		map[string]string{
-			"name":      "Miguel de Cervantes Saavedra",
-			"birthdate": "1547",
+			"name": "The Wind-Up Bird Chronicle",
+			"year": "1995",
 		})
 	record := tplData.(boocat.TemplateRecord)
 
@@ -107,24 +89,59 @@ func TestSaveNew(t *testing.T) {
 	}
 	// Check the record
 	if err := checkTemplateRecord(record,
-		"/author/"+db.LastID("author"),
+		"/book/"+db.LastID("book"),
 		map[string]string{
-			"name":      "Miguel de Cervantes Saavedra",
-			"birthdate": "1547",
+			"Name": "The Wind-Up Bird Chronicle",
+			"Year": "1995",
 		}); err != nil {
 
 		t.Error(err)
 	}
 }
 
-// TestEditExisting tests boocat.EditExisting
+// TestSaveNewValidationFail tests boocat.SaveNew when validation fails
+func TestSaveNewValidationFail(t *testing.T) {
+	// Intialize database
+	db := initializedDB()
+
+	// Run SaveNew with a new author
+	tplName, tplData := boocat.SaveNew(context.TODO(), db, "author", "",
+		map[string]string{
+			"name":      "miguel de cervantes saavedra",
+			"birthdate": "",
+		})
+	form := tplData.(boocat.TemplateForm)
+
+	// Check the template
+	if tplName != "edit" {
+		t.Errorf("expected template \"edit\" but got \"%v\"", tplName)
+	}
+	// Check the form
+	if err := checkForm(form, "author", "/author/save", 2); err != nil {
+		t.Error(err)
+	}
+	// Check name field
+	if err := checkTemplateField(form.Fields, "name",
+		"Name", "A-Z,a-z", "miguel de cervantes saavedra", true); err != nil {
+
+		t.Error(err)
+	}
+	// Check birthdate field
+	if err := checkTemplateField(form.Fields, "birthdate",
+		"Year of birth", "A year", "", true); err != nil {
+
+		t.Error(err)
+	}
+}
+
+// TestEditExisting tests boocat.EditExisting when validation succeeds
 func TestEditExisting(t *testing.T) {
 	// Initialize the database
 	db := initializedDB()
 
 	// Run EditExisting with the last book in the database
 	tplName, tplData := boocat.EditExisting(context.TODO(), db, "book",
-		db.LastID("book"), nil)
+		"book4", nil)
 	form := tplData.(boocat.TemplateForm)
 
 	// Check the template
@@ -139,12 +156,46 @@ func TestEditExisting(t *testing.T) {
 	}
 	// Check name field
 	if err := checkTemplateField(form.Fields, "name", "Name", "A-Z,a-z",
-		"Nineteen Eighty-Four"); err != nil {
+		"Nineteen Eighty-Four", false); err != nil {
 
 		t.Error(err)
 	}
+}
 
-	// @TODO Check returned validators somehow?
+// TestEditExistingValidationFail tests boocat.EditExisting when validation
+// fails. This could happen because format validation could change after the record
+// was created.
+func TestEditExistingValidationFail(t *testing.T) {
+	// Initialize the database
+	db := initializedDB()
+
+	// Run EditExisting with the last book in the database
+	tplName, tplData := boocat.EditExisting(context.TODO(), db, "author",
+		db.LastID("author"), nil)
+	form := tplData.(boocat.TemplateForm)
+
+	// Check the template
+	if tplName != "edit" {
+		t.Errorf("expected template \"edit\" but got \"%v\"", tplName)
+	}
+	// Check the form
+	if err := checkForm(form, "author", "/author/"+db.LastID("author")+"/save",
+		2); err != nil {
+
+		t.Error(err)
+	}
+	// Check name field
+	if err := checkTemplateField(form.Fields, "name", "Name", "A-Z,a-z",
+		"miguel de cervantes saavedra", true); err != nil {
+
+		t.Error(err)
+	}
+	// Check birthdate field
+	if err := checkTemplateField(form.Fields, "birthdate", "Year of birth", "A year",
+		"MDXLVII", true); err != nil {
+
+		t.Error(err)
+	}
 }
 
 // TestSaveExisting tests boocat.SaveExisting
@@ -169,8 +220,8 @@ func TestSaveExisting(t *testing.T) {
 	if err := checkTemplateRecord(record,
 		"/author/"+db.LastID("author"),
 		map[string]string{
-			"name":      "Simone de Beauvoir",
-			"birthdate": "1908",
+			"Name":          "Simone de Beauvoir",
+			"Year of birth": "1908",
 		}); err != nil {
 
 		t.Error(err)
@@ -184,7 +235,7 @@ func TestView(t *testing.T) {
 
 	// Run View with the last author in the database
 	tplName, tplData := boocat.View(context.TODO(), db, "author",
-		db.LastID("author"), nil)
+		"author2", nil)
 	record := tplData.(boocat.TemplateRecord)
 
 	// Check the template
@@ -263,7 +314,7 @@ func checkForm(form boocat.TemplateForm, name, url string,
 
 // checkTemplateField checks the values of a TemplateField
 func checkTemplateField(fields []boocat.TemplateField, name,
-	label, description, value string) error {
+	label, description, value string, valFail bool) error {
 
 	for _, field := range fields {
 		if field.Name == name {
@@ -281,6 +332,14 @@ func checkTemplateField(fields []boocat.TemplateField, name,
 				return fmt.Errorf(
 					"unexpected field value \"%v\" should be \"%v\"",
 					field.Value, value)
+			}
+			if field.ValidationFailed && !valFail {
+				return errors.New(
+					"value should not have failed validation")
+			}
+			if !field.ValidationFailed && valFail {
+				return errors.New(
+					"value should have failed validation")
 			}
 
 			return nil

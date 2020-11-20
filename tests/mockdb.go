@@ -108,7 +108,7 @@ func (db *MockDB) GetRecord(ctx context.Context, format,
 		return &record, nil
 	}
 
-	return nil, nil
+	return nil, fmt.Errorf("unknown record %v", id)
 }
 
 // GetFormat returns a format
@@ -116,14 +116,14 @@ func (db *MockDB) GetFormat(ctx context.Context,
 	id string) (*database.Format, error) {
 	//@TDOO: This is a mock-up
 	if id == "author" {
-		nameRegExp, _ := regexp.Compile("([A-Z][a-z]* )*([A-Z][a-z]*)")
+		nameRegExp, _ := regexp.Compile("^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
 		nameField := database.FormatField{
 			Name:        "name",
 			Label:       "Name",
 			Description: "A-Z,a-z",
 			Validator:   nameRegExp,
 		}
-		birthdateRegExp, _ := regexp.Compile("[1|2][0-9]{3}")
+		birthdateRegExp, _ := regexp.Compile("^[1|2][0-9]{3}$")
 		birthdateField := database.FormatField{
 			Name:        "birthdate",
 			Label:       "Year of birth",
@@ -137,14 +137,14 @@ func (db *MockDB) GetFormat(ctx context.Context,
 		}, nil
 
 	} else if id == "book" {
-		nameRegExp, _ := regexp.Compile("([A-Z][a-z]* )*([A-Z][a-z]*)")
+		nameRegExp, _ := regexp.Compile("^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
 		nameField := database.FormatField{
 			Name:        "name",
 			Label:       "Name",
 			Description: "A-Z,a-z",
 			Validator:   nameRegExp,
 		}
-		yearRegExp, _ := regexp.Compile("[1|2][0-9]{3}")
+		yearRegExp, _ := regexp.Compile("^[1|2][0-9]{3}$")
 		yearField := database.FormatField{
 			Name:        "year",
 			Label:       "Year",

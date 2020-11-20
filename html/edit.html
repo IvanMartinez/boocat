@@ -2,7 +2,11 @@
 
 <form action="{{.SubmitURL}}" method="POST">
 {{range .Fields}}
-    <div>{{.Label}}<input type="text" id="{{.Name}}" name="{{.Name}}" value="{{.Value}}"/>{{.Description}}</div>
+    <div>{{.Label}}<input type="text" id="{{.Name}}" name="{{.Name}}" value="{{.Value}}"/>
+        {{if .ValidationFailed}}
+        <div style="color:red;">{{.Description}}</div>
+        {{end}}
+    </div>
 {{end}}
     <div><input type="submit" value="Save"/></div>
 </form>
