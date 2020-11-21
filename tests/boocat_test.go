@@ -207,7 +207,7 @@ func TestSaveExisting(t *testing.T) {
 	tplName, tplData := boocat.SaveExisting(context.TODO(), db, "author",
 		db.LastID("author"),
 		map[string]string{
-			"name":      "Simone de Beauvoir",
+			"name":      "Simone De Beauvoir",
 			"birthdate": "1908",
 		})
 	record := tplData.(boocat.TemplateRecord)
@@ -220,9 +220,46 @@ func TestSaveExisting(t *testing.T) {
 	if err := checkTemplateRecord(record,
 		"/author/"+db.LastID("author"),
 		map[string]string{
-			"Name":          "Simone de Beauvoir",
+			"Name":          "Simone De Beauvoir",
 			"Year of birth": "1908",
 		}); err != nil {
+
+		t.Error(err)
+	}
+}
+
+// TestSaveExistingValidationFail tests boocat.SaveExisting when validation
+// fails
+func TestSaveExistingValidationFail(t *testing.T) {
+	// Initialize database
+	db := initializedDB()
+
+	// Run SaveExisting with a new author
+	tplName, tplData := boocat.SaveExisting(context.TODO(), db, "book",
+		"book1",
+		map[string]string{
+			"name": "the road to wigan pier",
+			"year": "MCMXXXVII",
+		})
+	form := tplData.(boocat.TemplateForm)
+
+	// Check the template
+	if tplName != "edit" {
+		t.Errorf("expected template \"edit\" but got \"%v\"", tplName)
+	}
+	// Check the form
+	if err := checkForm(form, "book", "/book/book1/save", 2); err != nil {
+		t.Error(err)
+	}
+	// Check name field
+	if err := checkTemplateField(form.Fields, "name",
+		"Name", "A-Z,a-z", "the road to wigan pier", true); err != nil {
+
+		t.Error(err)
+	}
+	// Check birthdate field
+	if err := checkTemplateField(form.Fields, "year",
+		"Year", "A year", "MCMXXXVII", true); err != nil {
 
 		t.Error(err)
 	}

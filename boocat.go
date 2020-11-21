@@ -68,7 +68,6 @@ func SaveNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 		submittedValues)
 
 	if !validationFailed {
-		// @TODO: Validate values
 		dbID, err := db.AddRecord(ctx, pFormat, submittedValues)
 		if err != nil {
 			log.Printf("error adding record to database: %v\n", err)
@@ -121,18 +120,39 @@ func EditExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 func SaveExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 	submittedValues map[string]string) (string, interface{}) {
 
-	record := database.Record{
-		DbID:        pRecord,
-		FieldValues: submittedValues,
-	}
-	if err := db.UpdateRecord(ctx, pFormat, record); err != nil {
-		log.Printf("error updating record in database: %v\n", err)
+	format, err := db.GetFormat(ctx, pFormat)
+	if err != nil {
+		log.Printf("couldn't get format \"%v\": %v\n", pFormat, err)
+		return "", nil
 	}
 
-	tplName, tplData := View(ctx, db, pFormat, pRecord, nil)
-	return tplName, tplData
+	tplFields, validationFailed := validatedFieldsWithValue(format,
+		submittedValues)
+
+	if !validationFailed {
+		record := database.Record{
+			DbID:        pRecord,
+			FieldValues: submittedValues,
+		}
+		if err := db.UpdateRecord(ctx, pFormat, record); err != nil {
+			log.Printf("error updating record in database: %v\n", err)
+		}
+
+		tplName, tplData := View(ctx, db, pFormat, pRecord, nil)
+		return tplName, tplData
+	} else {
+		tData := TemplateForm{
+			Name:   format.Name,
+			Fields: tplFields,
+			SubmitURL: template.URL(
+				HTTPURL + "/" + pFormat + "/" + pRecord + "/save"),
+		}
+
+		return "edit", tData
+	}
 }
 
+// View returns the data to show a record
 func View(ctx context.Context, db database.DB, pFormat, pRecord string,
 	_submittedValues map[string]string) (string, interface{}) {
 
