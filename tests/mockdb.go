@@ -3,10 +3,11 @@ package tests
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strconv"
 
 	"github.com/ivanmartinez/boocat/database"
+
+	"github.com/ivanmartinez/boocat/validators"
 )
 
 // MockDB is a database mock for testing
@@ -116,19 +117,20 @@ func (db *MockDB) GetFormat(ctx context.Context,
 	id string) (*database.Format, error) {
 	//@TDOO: This is a mock-up
 	if id == "author" {
-		nameRegExp, _ := regexp.Compile("^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
+		nameValidator, _ := validators.NewRegExpValidator(
+			"^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
 		nameField := database.FormatField{
 			Name:        "name",
 			Label:       "Name",
 			Description: "A-Z,a-z",
-			Validator:   nameRegExp,
+			Validator:   nameValidator,
 		}
-		birthdateRegExp, _ := regexp.Compile("^[1|2][0-9]{3}$")
+		birthdateValidator, _ := validators.NewRegExpValidator("^[1|2][0-9]{3}$")
 		birthdateField := database.FormatField{
 			Name:        "birthdate",
 			Label:       "Year of birth",
 			Description: "A year",
-			Validator:   birthdateRegExp,
+			Validator:   birthdateValidator,
 		}
 
 		return &database.Format{
@@ -137,19 +139,20 @@ func (db *MockDB) GetFormat(ctx context.Context,
 		}, nil
 
 	} else if id == "book" {
-		nameRegExp, _ := regexp.Compile("^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
+		nameValidator, _ := validators.NewRegExpValidator(
+			"^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
 		nameField := database.FormatField{
 			Name:        "name",
 			Label:       "Name",
 			Description: "A-Z,a-z",
-			Validator:   nameRegExp,
+			Validator:   nameValidator,
 		}
-		yearRegExp, _ := regexp.Compile("^[1|2][0-9]{3}$")
+		yearValidator, _ := validators.NewRegExpValidator("^[1|2][0-9]{3}$")
 		yearField := database.FormatField{
 			Name:        "year",
 			Label:       "Year",
 			Description: "A year",
-			Validator:   yearRegExp,
+			Validator:   yearValidator,
 		}
 
 		return &database.Format{

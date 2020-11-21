@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"log"
-	"regexp"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"github.com/ivanmartinez/boocat/validators"
 )
 
 const (
@@ -34,10 +35,10 @@ type Format struct {
 // FormatField defines defines a form field, together with the
 // allowed values
 type FormatField struct {
-	Name        string         // ID
-	Label       string         // Display name
-	Description string         // Text description
-	Validator   *regexp.Regexp // Regular expression to validate the values
+	Name        string               // ID
+	Label       string               // Display name
+	Description string               // Text description
+	Validator   validators.Validator // Regular expression to validate the values
 }
 
 // DB is the database interface
@@ -181,19 +182,20 @@ func (db *MongoDB) GetRecord(ctx context.Context, format,
 // GetFormat returns a format
 func (db *MongoDB) GetFormat(ctx context.Context, id string) (*Format, error) {
 	if id == "author" {
-		nameRegExp, _ := regexp.Compile("^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
+		nameValidator, _ := validators.NewRegExpValidator(
+			"^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
 		nameField := FormatField{
 			Name:        "name",
 			Label:       "Name",
 			Description: "A-Z,a-z",
-			Validator:   nameRegExp,
+			Validator:   nameValidator,
 		}
-		birthdateRegExp, _ := regexp.Compile("^[1|2][0-9]{3}$")
+		birthdateValidator, _ := validators.NewRegExpValidator("^[1|2][0-9]{3}$")
 		birthdateField := FormatField{
 			Name:        "birthdate",
 			Label:       "Year of birth",
 			Description: "A year",
-			Validator:   birthdateRegExp,
+			Validator:   birthdateValidator,
 		}
 
 		return &Format{
@@ -202,19 +204,20 @@ func (db *MongoDB) GetFormat(ctx context.Context, id string) (*Format, error) {
 		}, nil
 
 	} else if id == "book" {
-		nameRegExp, _ := regexp.Compile("^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
+		nameValidator, _ := validators.NewRegExpValidator(
+			"^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
 		nameField := FormatField{
 			Name:        "name",
 			Label:       "Name",
 			Description: "A-Z,a-z",
-			Validator:   nameRegExp,
+			Validator:   nameValidator,
 		}
-		yearRegExp, _ := regexp.Compile("^[1|2][0-9]{3}$")
+		yearValidator, _ := validators.NewRegExpValidator("^[1|2][0-9]{3}$")
 		yearField := FormatField{
 			Name:        "year",
 			Label:       "Year",
 			Description: "A year",
-			Validator:   yearRegExp,
+			Validator:   yearValidator,
 		}
 
 		return &Format{

@@ -223,7 +223,7 @@ func validatedFieldsWithValue(format *database.Format,
 			tplFields[index].Value = value
 			// If there is no validator or validation passed
 			if field.Validator == nil ||
-				field.Validator.MatchString(value) {
+				field.Validator.Validate(value) {
 
 				tplFields[index].ValidationFailed = false
 			} else {
