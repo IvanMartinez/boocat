@@ -4,16 +4,17 @@ import (
 	"context"
 	"errors"
 	"log"
-	"regexp"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"github.com/ivanmartinez/boocat/validators"
 )
 
 const (
-	dbName = "strki"
+	dbName = "boocat"
 )
 
 // Record represents the data of an entity, currently author or book
@@ -34,16 +35,16 @@ type Format struct {
 // FormatField defines defines a form field, together with the
 // allowed values
 type FormatField struct {
-	Name        string         // ID
-	Label       string         // Display name
-	Description string         // Text description
-	Validator   *regexp.Regexp // Regular expression to validate the values
+	Name        string               // ID
+	Label       string               // Display name
+	Description string               // Text description
+	Validator   validators.Validator // Regular expression to validate the values
 }
 
 // DB is the database interface
 type DB interface {
 	AddRecord(ctx context.Context, format string,
-		fields map[string]string) error
+		fields map[string]string) (string, error)
 	UpdateRecord(ctx context.Context, format string, record Record) error
 	GetAllRecords(ctx context.Context, format string) ([]Record, error)
 	GetRecord(ctx context.Context, format, id string) (*Record, error)
@@ -95,16 +96,19 @@ func (db *MongoDB) Disconnect(ctx context.Context) {
 // AddRecord adds a new record (author, book...) with the given field values to
 // the database
 func (db *MongoDB) AddRecord(ctx context.Context, format string,
-	values map[string]string) error {
+	values map[string]string) (string, error) {
 
 	// If there is a collection for the format
 	if col, found := db.collections[format]; found {
 		// Insert the record
-		_, err := col.InsertOne(ctx, values)
-		return err
+		if res, err := col.InsertOne(ctx, values); err == nil {
+			return res.InsertedID.(primitive.ObjectID).Hex(), err
+		} else {
+			return "", err
+		}
 	}
 
-	return errors.New("format not found")
+	return "", errors.New("format not found")
 }
 
 // Update updates a database record (author, book...) with the given
@@ -178,19 +182,20 @@ func (db *MongoDB) GetRecord(ctx context.Context, format,
 // GetFormat returns a format
 func (db *MongoDB) GetFormat(ctx context.Context, id string) (*Format, error) {
 	if id == "author" {
-		nameRegExp, _ := regexp.Compile("([A-Z][a-z]* )*([A-Z][a-z]*)")
+		nameValidator, _ := validators.NewRegExpValidator(
+			"^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
 		nameField := FormatField{
 			Name:        "name",
 			Label:       "Name",
 			Description: "A-Z,a-z",
-			Validator:   nameRegExp,
+			Validator:   nameValidator,
 		}
-		birthdateRegExp, _ := regexp.Compile("[1|2][0-9]{3}")
+		birthdateValidator, _ := validators.NewRegExpValidator("^[1|2][0-9]{3}$")
 		birthdateField := FormatField{
 			Name:        "birthdate",
 			Label:       "Year of birth",
 			Description: "A year",
-			Validator:   birthdateRegExp,
+			Validator:   birthdateValidator,
 		}
 
 		return &Format{
@@ -199,19 +204,20 @@ func (db *MongoDB) GetFormat(ctx context.Context, id string) (*Format, error) {
 		}, nil
 
 	} else if id == "book" {
-		nameRegExp, _ := regexp.Compile("([A-Z][a-z]* )*([A-Z][a-z]*)")
+		nameValidator, _ := validators.NewRegExpValidator(
+			"^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
 		nameField := FormatField{
 			Name:        "name",
 			Label:       "Name",
 			Description: "A-Z,a-z",
-			Validator:   nameRegExp,
+			Validator:   nameValidator,
 		}
-		yearRegExp, _ := regexp.Compile("[1|2][0-9]{3}")
+		yearValidator, _ := validators.NewRegExpValidator("^[1|2][0-9]{3}$")
 		yearField := FormatField{
 			Name:        "year",
 			Label:       "Year",
 			Description: "A year",
-			Validator:   yearRegExp,
+			Validator:   yearValidator,
 		}
 
 		return &Format{
