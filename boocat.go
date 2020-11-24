@@ -6,23 +6,14 @@ import (
 	"log"
 
 	"github.com/ivanmartinez/boocat/database"
+	"github.com/ivanmartinez/boocat/formats"
 )
 
 // TemplateForm contains the data to generate a form with a HTML template
 type TemplateForm struct {
-	Name      string          // ID
-	Fields    []TemplateField // Fields
-	SubmitURL template.URL    // Submit URL
-}
-
-// TemplateField contains the data to generate a field of a form with
-// a HTML template
-type TemplateField struct {
-	Name             string // ID
-	Label            string // Display name
-	Description      string // Description
-	Value            string // Value
-	ValidationFailed bool   // Whether the value failed validation
+	Name      string                  // ID
+	Fields    []formats.TemplateField // Fields
+	SubmitURL template.URL            // Submit URL
 }
 
 // TemplateRecord contains the data to show a record (author, book...) with
@@ -40,15 +31,15 @@ var HTTPURL string
 func EditNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 	_submittedValues map[string]string) (string, interface{}) {
 
-	format, err := getFormat(ctx, pFormat)
-	if err != nil {
-		log.Printf("couldn't get format \"%v\": %v\n", pFormat, err)
+	format, found := formats.Get(pFormat)
+	if !found {
+		log.Printf("couldn't find format \"%v\"", pFormat)
 		return "", nil
 	}
 
 	tData := TemplateForm{
-		Name:      format.Name,
-		Fields:    format.templateFields(),
+		Name:      format.Name(),
+		Fields:    format.TemplateFields(),
 		SubmitURL: template.URL(HTTPURL + "/" + pFormat + "/save"),
 	}
 	return "edit", tData
@@ -58,13 +49,13 @@ func EditNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 func SaveNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 	submittedValues map[string]string) (string, interface{}) {
 
-	format, err := getFormat(ctx, pFormat)
-	if err != nil {
-		log.Printf("couldn't get format \"%v\": %v\n", pFormat, err)
+	format, found := formats.Get(pFormat)
+	if !found {
+		log.Printf("couldn't find format \"%v\"", pFormat)
 		return "", nil
 	}
 
-	tplFields, validationFailed := format.validatedFieldsWithValue(
+	tplFields, validationFailed := format.ValidatedFieldsWithValue(
 		submittedValues)
 
 	if !validationFailed {
@@ -77,7 +68,7 @@ func SaveNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 		return tplName, tplData
 	} else {
 		tData := TemplateForm{
-			Name:      format.Name,
+			Name:      format.Name(),
 			Fields:    tplFields,
 			SubmitURL: template.URL(HTTPURL + "/" + pFormat + "/save"),
 		}
@@ -92,9 +83,9 @@ func SaveNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 func EditExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 	_submittedValues map[string]string) (string, interface{}) {
 
-	format, err := getFormat(ctx, pFormat)
-	if err != nil {
-		log.Printf("couldn't get format \"%v\": %v\n", pFormat, err)
+	format, found := formats.Get(pFormat)
+	if !found {
+		log.Printf("couldn't find format \"%v\"", pFormat)
 		return "", nil
 	}
 
@@ -105,10 +96,10 @@ func EditExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 		return tplName, tplData
 	}
 
-	tplFields, _ := format.validatedFieldsWithValue(record.FieldValues)
+	tplFields, _ := format.ValidatedFieldsWithValue(record.FieldValues)
 
 	tData := TemplateForm{
-		Name:   format.Name,
+		Name:   format.Name(),
 		Fields: tplFields,
 		SubmitURL: template.URL(
 			HTTPURL + "/" + pFormat + "/" + record.DbID + "/save"),
@@ -120,13 +111,13 @@ func EditExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 func SaveExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 	submittedValues map[string]string) (string, interface{}) {
 
-	format, err := getFormat(ctx, pFormat)
-	if err != nil {
-		log.Printf("couldn't get format \"%v\": %v\n", pFormat, err)
+	format, found := formats.Get(pFormat)
+	if !found {
+		log.Printf("couldn't find format \"%v\"", pFormat)
 		return "", nil
 	}
 
-	tplFields, validationFailed := format.validatedFieldsWithValue(
+	tplFields, validationFailed := format.ValidatedFieldsWithValue(
 		submittedValues)
 
 	if !validationFailed {
@@ -142,7 +133,7 @@ func SaveExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 		return tplName, tplData
 	} else {
 		tData := TemplateForm{
-			Name:   format.Name,
+			Name:   format.Name(),
 			Fields: tplFields,
 			SubmitURL: template.URL(
 				HTTPURL + "/" + pFormat + "/" + pRecord + "/save"),
@@ -156,9 +147,9 @@ func SaveExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 func View(ctx context.Context, db database.DB, pFormat, pRecord string,
 	_submittedValues map[string]string) (string, interface{}) {
 
-	format, err := getFormat(ctx, pFormat)
-	if err != nil {
-		log.Printf("couldn't get format \"%v\": %v\n", pFormat, err)
+	format, found := formats.Get(pFormat)
+	if !found {
+		log.Printf("couldn't find format \"%v\"", pFormat)
 		return "", nil
 	}
 
@@ -171,7 +162,7 @@ func View(ctx context.Context, db database.DB, pFormat, pRecord string,
 
 	tData := TemplateRecord{
 		URL:         HTTPURL + "/" + pFormat + "/" + pRecord,
-		FieldValues: format.labelValues(record.FieldValues),
+		FieldValues: format.LabelValues(record.FieldValues),
 	}
 	return "view", tData
 }
