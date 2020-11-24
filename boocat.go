@@ -11,9 +11,9 @@ import (
 
 // TemplateForm contains the data to generate a form with a HTML template
 type TemplateForm struct {
-	Name      string                  // ID
-	Fields    []formats.TemplateField // Fields
-	SubmitURL template.URL            // Submit URL
+	Name      string          // ID
+	Fields    []formats.Field // Fields
+	SubmitURL template.URL    // Submit URL
 }
 
 // TemplateRecord contains the data to show a record (author, book...) with
@@ -38,8 +38,8 @@ func EditNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 	}
 
 	tData := TemplateForm{
-		Name:      format.Name(),
-		Fields:    format.TemplateFields(),
+		Name:      format.Label,
+		Fields:    format.Fields,
 		SubmitURL: template.URL(HTTPURL + "/" + pFormat + "/save"),
 	}
 	return "edit", tData
@@ -68,7 +68,7 @@ func SaveNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 		return tplName, tplData
 	} else {
 		tData := TemplateForm{
-			Name:      format.Name(),
+			Name:      format.Label,
 			Fields:    tplFields,
 			SubmitURL: template.URL(HTTPURL + "/" + pFormat + "/save"),
 		}
@@ -99,7 +99,7 @@ func EditExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 	tplFields, _ := format.ValidatedFieldsWithValue(record.FieldValues)
 
 	tData := TemplateForm{
-		Name:   format.Name(),
+		Name:   format.Label,
 		Fields: tplFields,
 		SubmitURL: template.URL(
 			HTTPURL + "/" + pFormat + "/" + record.DbID + "/save"),
@@ -133,7 +133,7 @@ func SaveExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 		return tplName, tplData
 	} else {
 		tData := TemplateForm{
-			Name:   format.Name(),
+			Name:   format.Label,
 			Fields: tplFields,
 			SubmitURL: template.URL(
 				HTTPURL + "/" + pFormat + "/" + pRecord + "/save"),

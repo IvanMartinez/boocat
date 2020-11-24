@@ -67,11 +67,11 @@ func TestEditNew(t *testing.T) {
 		t.Errorf("expected template \"edit\" but got \"%v\"", tplName)
 	}
 	// Check the form
-	if err := checkForm(form, "author", "/author/save", 3); err != nil {
+	if err := checkForm(form, "Author", "/author/save", 3); err != nil {
 		t.Error(err)
 	}
 	// Check birthdate field
-	if err := checkTemplateField(form.Fields, "birthdate",
+	if err := checkField(form.Fields, "birthdate",
 		"Year of birth", "A year", "", false); err != nil {
 
 		t.Error(err)
@@ -129,17 +129,17 @@ func TestSaveNewValidationFail(t *testing.T) {
 		t.Errorf("expected template \"edit\" but got \"%v\"", tplName)
 	}
 	// Check the form
-	if err := checkForm(form, "author", "/author/save", 3); err != nil {
+	if err := checkForm(form, "Author", "/author/save", 3); err != nil {
 		t.Error(err)
 	}
 	// Check name field
-	if err := checkTemplateField(form.Fields, "name",
+	if err := checkField(form.Fields, "name",
 		"Name", "A-Z,a-z", "miguel de cervantes saavedra", true); err != nil {
 
 		t.Error(err)
 	}
 	// Check birthdate field
-	if err := checkTemplateField(form.Fields, "birthdate",
+	if err := checkField(form.Fields, "birthdate",
 		"Year of birth", "A year", "", true); err != nil {
 
 		t.Error(err)
@@ -162,13 +162,13 @@ func TestEditExisting(t *testing.T) {
 		t.Errorf("expected template \"edit\" but got \"%v\"", tplName)
 	}
 	// Check the form
-	if err := checkForm(form, "book", "/book/"+db.LastID("book")+"/save",
+	if err := checkForm(form, "Book", "/book/"+db.LastID("book")+"/save",
 		3); err != nil {
 
 		t.Error(err)
 	}
 	// Check name field
-	if err := checkTemplateField(form.Fields, "name", "Name", "A-Z,a-z",
+	if err := checkField(form.Fields, "name", "Name", "A-Z,a-z",
 		"Nineteen Eighty-Four", false); err != nil {
 
 		t.Error(err)
@@ -193,19 +193,19 @@ func TestEditExistingValidationFail(t *testing.T) {
 		t.Errorf("expected template \"edit\" but got \"%v\"", tplName)
 	}
 	// Check the form
-	if err := checkForm(form, "author", "/author/"+db.LastID("author")+"/save",
+	if err := checkForm(form, "Author", "/author/"+db.LastID("author")+"/save",
 		3); err != nil {
 
 		t.Error(err)
 	}
 	// Check name field
-	if err := checkTemplateField(form.Fields, "name", "Name", "A-Z,a-z",
+	if err := checkField(form.Fields, "name", "Name", "A-Z,a-z",
 		"miguel de cervantes saavedra", true); err != nil {
 
 		t.Error(err)
 	}
 	// Check birthdate field
-	if err := checkTemplateField(form.Fields, "birthdate", "Year of birth", "A year",
+	if err := checkField(form.Fields, "birthdate", "Year of birth", "A year",
 		"MDXLVII", true); err != nil {
 
 		t.Error(err)
@@ -265,17 +265,17 @@ func TestSaveExistingValidationFail(t *testing.T) {
 		t.Errorf("expected template \"edit\" but got \"%v\"", tplName)
 	}
 	// Check the form
-	if err := checkForm(form, "book", "/book/book1/save", 3); err != nil {
+	if err := checkForm(form, "Book", "/book/book1/save", 3); err != nil {
 		t.Error(err)
 	}
 	// Check name field
-	if err := checkTemplateField(form.Fields, "name",
+	if err := checkField(form.Fields, "name",
 		"Name", "A-Z,a-z", "the road to wigan pier", true); err != nil {
 
 		t.Error(err)
 	}
 	// Check birthdate field
-	if err := checkTemplateField(form.Fields, "year",
+	if err := checkField(form.Fields, "year",
 		"Year", "A year", "MCMXXXVII", true); err != nil {
 
 		t.Error(err)
@@ -358,7 +358,7 @@ func checkForm(form boocat.TemplateForm, name, url string,
 	fields int) error {
 
 	if form.Name != name {
-		return fmt.Errorf("unexpected form name \"%v\" should be \"%v\"",
+		return fmt.Errorf("unexpected form label \"%v\" should be \"%v\"",
 			form.Name, name)
 	}
 	if form.SubmitURL != template.URL(url) {
@@ -373,8 +373,8 @@ func checkForm(form boocat.TemplateForm, name, url string,
 	return nil
 }
 
-// checkTemplateField checks the values of a TemplateField
-func checkTemplateField(fields []formats.TemplateField, name,
+// checkField checks the values of a Field
+func checkField(fields []formats.Field, name,
 	label, description, value string, valFail bool) error {
 
 	for _, field := range fields {

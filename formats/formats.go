@@ -10,32 +10,20 @@ var formats map[string]*Format
 // including the allowed values for the fields. As a consequence, it defines
 // the fields and allowed values of the records.
 type Format struct {
-	// ID
-	// @TODO: Re-think this field, ID or label?
-	name string
-	// Fields of the format that identify a record. This should be the minimum
-	// set of fields whose values differentiate a record from the rest.
-	idFields []formatField
-	// Other non-ID fields of the record
-	otherFields []formatField
-	// idFields + otherFields
-	allFields []formatField
-	// fields of the record as []TemplateField
-	tplFields []TemplateField
+	// Display name
+	Label string
+	// Fields of the format
+	Fields []Field
+	// Fields[:idSliceLimit] is the minimum set of fields whose values diferentiate
+	// a record from the rest
+	idSliceLimit int
+	// validators for the values of the fields
+	validators map[string]validators.Validator
 }
 
-// formatField defines defines a form field, together with the
-// allowed values
-type formatField struct {
-	Name        string               // ID
-	Label       string               // Display name
-	Description string               // Text description
-	Validator   validators.Validator // Regular expression to validate the values
-}
-
-// TemplateField contains the data to generate a field of a form with
+// Field contains the data to generate a field of a form with
 // a HTML template
-type TemplateField struct {
+type Field struct {
 	Name             string // ID
 	Label            string // Display name
 	Description      string // Description
@@ -46,52 +34,54 @@ type TemplateField struct {
 func Initialize() {
 	formats = make(map[string]*Format)
 
+	name := Field{
+		Name:        "name",
+		Label:       "Name",
+		Description: "A-Z,a-z",
+	}
+	birthdate := Field{
+		Name:        "birthdate",
+		Label:       "Year of birth",
+		Description: "A year",
+	}
+	year := Field{
+		Name:        "year",
+		Label:       "Year",
+		Description: "A year",
+	}
+	bio := Field{
+		Name:        "biography",
+		Label:       "Biography",
+		Description: "Free text",
+	}
+	synopsis := Field{
+		Name:        "synopsis",
+		Label:       "Synopsis",
+		Description: "Free text",
+	}
+
 	nameValidator, _ := validators.NewRegExpValidator(
 		"^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
 	yearValidator, _ := validators.NewRegExpValidator("^[1|2][0-9]{3}$")
 
-	name := formatField{
-		Name:        "name",
-		Label:       "Name",
-		Description: "A-Z,a-z",
-		Validator:   nameValidator,
-	}
-	birthdate := formatField{
-		Name:        "birthdate",
-		Label:       "Year of birth",
-		Description: "A year",
-		Validator:   yearValidator,
-	}
-	year := formatField{
-		Name:        "year",
-		Label:       "Year",
-		Description: "A year",
-		Validator:   yearValidator,
-	}
-	bio := formatField{
-		Name:        "biography",
-		Label:       "Biography",
-		Description: "Free text",
-		Validator:   nil,
-	}
-	synopsis := formatField{
-		Name:        "synopsis",
-		Label:       "Synopsis",
-		Description: "Free text",
-		Validator:   nil,
+	formats["author"] = &Format{
+		Label:        "Author",
+		Fields:       []Field{name, birthdate, bio},
+		idSliceLimit: 1,
+		validators: map[string]validators.Validator{
+			"name":      nameValidator,
+			"birthdate": yearValidator,
+		},
 	}
 
-	formats["author"] = &Format{
-		name:        "author",
-		idFields:    []formatField{name},
-		otherFields: []formatField{birthdate, bio},
-		allFields:   []formatField{name, birthdate, bio},
-	}
 	formats["book"] = &Format{
-		name:        "book",
-		idFields:    []formatField{name, year},
-		otherFields: []formatField{synopsis},
-		allFields:   []formatField{name, year, synopsis},
+		Label:        "Book",
+		Fields:       []Field{name, year, synopsis},
+		idSliceLimit: 2,
+		validators: map[string]validators.Validator{
+			"name": nameValidator,
+			"year": yearValidator,
+		},
 	}
 }
 
@@ -101,63 +91,45 @@ func Get(name string) (*Format, bool) {
 	return format, found
 }
 
-func (f *Format) Name() string {
-	return f.name
-}
-
-// templateFields takes a format and returns a slice of TemplateField
-func (f *Format) TemplateFields() []TemplateField {
-
-	fieldsWithValue := make([]TemplateField, len(f.allFields),
-		len(f.allFields))
-	for index, field := range f.allFields {
-		fieldsWithValue[index].Name = field.Name
-		fieldsWithValue[index].Label = field.Label
-		fieldsWithValue[index].Description = field.Description
-		fieldsWithValue[index].Value = ""
-	}
-	return fieldsWithValue
-}
-
 // ValidatedFieldsWithValue takes a format and a slice of field values and
-// returns a slice of TemplateField with the values and results of validation
+// returns a slice of Field with the values and results of validation
 func (f *Format) ValidatedFieldsWithValue(
-	fieldValues map[string]string) (tplFields []TemplateField,
+	fieldValues map[string]string) (tplFields []Field,
 	valFailed bool) {
 
-	tplFields = make([]TemplateField, len(f.allFields),
-		len(f.allFields))
+	tplFieldsWithValue := make([]Field, len(f.Fields),
+		len(f.Fields))
 	valFailed = false
 
-	for index, field := range f.allFields {
-		tplFields[index].Name = field.Name
-		tplFields[index].Label = field.Label
-		tplFields[index].Description = field.Description
+	for index, field := range f.Fields {
+		tplFieldsWithValue[index].Name = field.Name
+		tplFieldsWithValue[index].Label = field.Label
+		tplFieldsWithValue[index].Description = field.Description
+		tplFieldsWithValue[index].ValidationFailed = false
 		// If there is a value for the field
 		if value, found := fieldValues[field.Name]; found {
-			tplFields[index].Value = value
+			tplFieldsWithValue[index].Value = value
 			// If there is no validator or validation passed
-			if field.Validator == nil ||
-				field.Validator.Validate(value) {
-
-				tplFields[index].ValidationFailed = false
-			} else {
-				// Validation failed
-				tplFields[index].ValidationFailed = true
-				valFailed = true
+			if validator, found := f.validators[field.Name]; found {
+				if !validator.Validate(value) {
+					// Validation failed
+					tplFieldsWithValue[index].ValidationFailed = true
+					valFailed = true
+				}
 			}
 		}
 	}
-	return tplFields, valFailed
+
+	return tplFieldsWithValue, valFailed
 }
 
-// LabelValues takes a format and a slice of field values and returns a map of
-// the field labels with the values
+// LabelValues takes a slice of field values and returns a map of the field
+// labels with the values
 func (f *Format) LabelValues(
 	fieldValues map[string]string) map[string]string {
 
 	labelValues := make(map[string]string)
-	for _, field := range f.allFields {
+	for _, field := range f.Fields {
 		labelValues[field.Label] = fieldValues[field.Name]
 	}
 	return labelValues
