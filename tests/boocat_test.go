@@ -32,21 +32,25 @@ func initializedDB() (db *MockDB) {
 	db.AddRecord(context.TODO(), "book", map[string]string{
 		"name":     "Norwegian Wood",
 		"year":     "1987",
+		"author":   "author1",
 		"synopsis": "novel",
 	})
 	db.AddRecord(context.TODO(), "book", map[string]string{
 		"name":     "Kafka On The Shore",
 		"year":     "2002",
+		"author":   "author1",
 		"synopsis": "novel",
 	})
 	db.AddRecord(context.TODO(), "book", map[string]string{
 		"name":     "Animal Farm",
 		"year":     "1945",
+		"author":   "author2",
 		"synopsys": "fable",
 	})
 	db.AddRecord(context.TODO(), "book", map[string]string{
-		"name": "Nineteen Eighty-Four",
-		"year": "1949",
+		"name":   "Nineteen Eighty-Four",
+		"year":   "1949",
+		"author": "author2",
 	})
 	return db
 }
@@ -54,8 +58,8 @@ func initializedDB() (db *MockDB) {
 // TestEditNew tests boocat.EditNew
 func TestEditNew(t *testing.T) {
 	// Initialize formats and database
-	formats.Initialize()
 	db := initializedDB()
+	formats.Initialize(db)
 
 	// Run EditNew for author format
 	tplName, tplData := boocat.EditNew(context.TODO(), db, "author", "",
@@ -81,14 +85,15 @@ func TestEditNew(t *testing.T) {
 // TestSaveNew tests boocat.SaveNew when validation succeeds
 func TestSaveNew(t *testing.T) {
 	// Initialize formats and database
-	formats.Initialize()
 	db := initializedDB()
+	formats.Initialize(db)
 
 	// Run SaveNew with a new book
 	tplName, tplData := boocat.SaveNew(context.TODO(), db, "book", "",
 		map[string]string{
 			"name":     "The Wind-Up Bird Chronicle",
 			"year":     "1995",
+			"author":   "author1",
 			"synopsis": "novel",
 		})
 	record := tplData.(boocat.TemplateRecord)
@@ -104,17 +109,17 @@ func TestSaveNew(t *testing.T) {
 			"Name":     "The Wind-Up Bird Chronicle",
 			"Year":     "1995",
 			"Synopsis": "novel",
+			"Author":   "author1",
 		}); err != nil {
 
 		t.Error(err)
 	}
 }
 
-// TestSaveNewValidationFail tests boocat.SaveNew when validation fails
 func TestSaveNewValidationFail(t *testing.T) {
 	// Initialize formats and database
-	formats.Initialize()
 	db := initializedDB()
+	formats.Initialize(db)
 
 	// Run SaveNew with a new author
 	tplName, tplData := boocat.SaveNew(context.TODO(), db, "author", "",
@@ -149,8 +154,8 @@ func TestSaveNewValidationFail(t *testing.T) {
 // TestEditExisting tests boocat.EditExisting when validation succeeds
 func TestEditExisting(t *testing.T) {
 	// Initialize formats and database
-	formats.Initialize()
 	db := initializedDB()
+	formats.Initialize(db)
 
 	// Run EditExisting with the last book in the database
 	tplName, tplData := boocat.EditExisting(context.TODO(), db, "book",
@@ -163,7 +168,7 @@ func TestEditExisting(t *testing.T) {
 	}
 	// Check the form
 	if err := checkForm(form, "Book", "/book/"+db.LastID("book")+"/save",
-		3); err != nil {
+		4); err != nil {
 
 		t.Error(err)
 	}
@@ -180,8 +185,8 @@ func TestEditExisting(t *testing.T) {
 // was created.
 func TestEditExistingValidationFail(t *testing.T) {
 	// Initialize formats and database
-	formats.Initialize()
 	db := initializedDB()
+	formats.Initialize(db)
 
 	// Run EditExisting with the last book in the database
 	tplName, tplData := boocat.EditExisting(context.TODO(), db, "author",
@@ -215,8 +220,8 @@ func TestEditExistingValidationFail(t *testing.T) {
 // TestSaveExisting tests boocat.SaveExisting
 func TestSaveExisting(t *testing.T) {
 	// Initialize formats and database
-	formats.Initialize()
 	db := initializedDB()
+	formats.Initialize(db)
 
 	// Run SaveExisting with a new author
 	tplName, tplData := boocat.SaveExisting(context.TODO(), db, "author",
@@ -248,15 +253,16 @@ func TestSaveExisting(t *testing.T) {
 // fails
 func TestSaveExistingValidationFail(t *testing.T) {
 	// Initialize formats and database
-	formats.Initialize()
 	db := initializedDB()
+	formats.Initialize(db)
 
 	// Run SaveExisting with a new author
 	tplName, tplData := boocat.SaveExisting(context.TODO(), db, "book",
 		"book1",
 		map[string]string{
-			"name": "the road to wigan pier",
-			"year": "MCMXXXVII",
+			"name":   "the road to wigan pier",
+			"year":   "MCMXXXVII",
+			"author": "noauthor",
 		})
 	form := tplData.(boocat.TemplateForm)
 
@@ -265,7 +271,7 @@ func TestSaveExistingValidationFail(t *testing.T) {
 		t.Errorf("expected template \"edit\" but got \"%v\"", tplName)
 	}
 	// Check the form
-	if err := checkForm(form, "Book", "/book/book1/save", 3); err != nil {
+	if err := checkForm(form, "Book", "/book/book1/save", 4); err != nil {
 		t.Error(err)
 	}
 	// Check name field
@@ -280,13 +286,19 @@ func TestSaveExistingValidationFail(t *testing.T) {
 
 		t.Error(err)
 	}
+	// Check author field
+	if err := checkField(form.Fields, "author",
+		"Author", "Writer", "noauthor", true); err != nil {
+
+		t.Error(err)
+	}
 }
 
 // TestView tests boocat.View
 func TestView(t *testing.T) {
 	// Initialize formats and database
-	formats.Initialize()
 	db := initializedDB()
+	formats.Initialize(db)
 
 	// Run View with the last author in the database
 	tplName, tplData := boocat.View(context.TODO(), db, "author",
@@ -314,8 +326,8 @@ func TestView(t *testing.T) {
 // TestList tests boocat.List
 func TestList(t *testing.T) {
 	// Initialize formats and database
-	formats.Initialize()
 	db := initializedDB()
+	formats.Initialize(db)
 
 	// Run List for book format
 	tplName, tplData := boocat.List(context.TODO(), db, "book", "",
@@ -336,6 +348,7 @@ func TestList(t *testing.T) {
 			"name":     "Norwegian Wood",
 			"year":     "1987",
 			"synopsis": "novel",
+			"author":   "author1",
 		}); err != nil {
 
 		t.Error(err)
@@ -347,6 +360,7 @@ func TestList(t *testing.T) {
 			"name":     "Kafka On The Shore",
 			"year":     "2002",
 			"synopsis": "novel",
+			"author":   "author1",
 		}); err != nil {
 
 		t.Error(err)

@@ -1,9 +1,13 @@
 package formats
 
 import (
+	"context"
+
+	"github.com/ivanmartinez/boocat/database"
 	"github.com/ivanmartinez/boocat/validators"
 )
 
+// Available formats
 var formats map[string]*Format
 
 // Format defines a form to create or update records (authors, books...),
@@ -31,7 +35,8 @@ type Field struct {
 	ValidationFailed bool   // Whether the value failed validation
 }
 
-func Initialize() {
+// Initialize initializes the formats
+func Initialize(db database.DB) {
 	formats = make(map[string]*Format)
 
 	name := Field{
@@ -59,10 +64,16 @@ func Initialize() {
 		Label:       "Synopsis",
 		Description: "Free text",
 	}
+	author := Field{
+		Name:        "author",
+		Label:       "Author",
+		Description: "Writer",
+	}
 
 	nameValidator, _ := validators.NewRegExpValidator(
 		"^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
 	yearValidator, _ := validators.NewRegExpValidator("^[1|2][0-9]{3}$")
+	authorValidator := validators.NewReferenceValidator(db, "author")
 
 	formats["author"] = &Format{
 		Label:        "Author",
@@ -76,11 +87,12 @@ func Initialize() {
 
 	formats["book"] = &Format{
 		Label:        "Book",
-		Fields:       []Field{name, year, synopsis},
+		Fields:       []Field{name, year, author, synopsis},
 		idSliceLimit: 2,
 		validators: map[string]validators.Validator{
-			"name": nameValidator,
-			"year": yearValidator,
+			"name":   nameValidator,
+			"year":   yearValidator,
+			"author": authorValidator,
 		},
 	}
 }
@@ -93,7 +105,7 @@ func Get(name string) (*Format, bool) {
 
 // ValidatedFieldsWithValue takes a format and a slice of field values and
 // returns a slice of Field with the values and results of validation
-func (f *Format) ValidatedFieldsWithValue(
+func (f *Format) ValidatedFieldsWithValue(ctx context.Context,
 	fieldValues map[string]string) (tplFields []Field,
 	valFailed bool) {
 
@@ -111,7 +123,7 @@ func (f *Format) ValidatedFieldsWithValue(
 			tplFieldsWithValue[index].Value = value
 			// If there is no validator or validation passed
 			if validator, found := f.validators[field.Name]; found {
-				if !validator.Validate(value) {
+				if !validator.Validate(ctx, value) {
 					// Validation failed
 					tplFieldsWithValue[index].ValidationFailed = true
 					valFailed = true

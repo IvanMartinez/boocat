@@ -56,7 +56,7 @@ func SaveNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 	}
 
 	tplFields, validationFailed := format.ValidatedFieldsWithValue(
-		submittedValues)
+		ctx, submittedValues)
 
 	if !validationFailed {
 		dbID, err := db.AddRecord(ctx, pFormat, submittedValues)
@@ -96,7 +96,7 @@ func EditExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 		return tplName, tplData
 	}
 
-	tplFields, _ := format.ValidatedFieldsWithValue(record.FieldValues)
+	tplFields, _ := format.ValidatedFieldsWithValue(ctx, record.FieldValues)
 
 	tData := TemplateForm{
 		Name:   format.Label,
@@ -117,7 +117,7 @@ func SaveExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 		return "", nil
 	}
 
-	tplFields, validationFailed := format.ValidatedFieldsWithValue(
+	tplFields, validationFailed := format.ValidatedFieldsWithValue(ctx,
 		submittedValues)
 
 	if !validationFailed {
