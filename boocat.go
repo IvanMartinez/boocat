@@ -6,23 +6,14 @@ import (
 	"log"
 
 	"github.com/ivanmartinez/boocat/database"
+	"github.com/ivanmartinez/boocat/formats"
 )
 
 // TemplateForm contains the data to generate a form with a HTML template
 type TemplateForm struct {
 	Name      string          // ID
-	Fields    []TemplateField // Fields
+	Fields    []formats.Field // Fields
 	SubmitURL template.URL    // Submit URL
-}
-
-// TemplateField contains the data to generate a field of a form with
-// a HTML template
-type TemplateField struct {
-	Name             string // ID
-	Label            string // Display name
-	Description      string // Description
-	Value            string // Value
-	ValidationFailed bool   // Whether the value failed validation
 }
 
 // TemplateRecord contains the data to show a record (author, book...) with
@@ -40,15 +31,15 @@ var HTTPURL string
 func EditNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 	_submittedValues map[string]string) (string, interface{}) {
 
-	format, err := db.GetFormat(ctx, pFormat)
-	if err != nil {
-		log.Printf("couldn't get format \"%v\": %v\n", pFormat, err)
+	format, found := formats.Get(pFormat)
+	if !found {
+		log.Printf("couldn't find format \"%v\"", pFormat)
 		return "", nil
 	}
 
 	tData := TemplateForm{
-		Name:      format.Name,
-		Fields:    templateFields(format),
+		Name:      format.Label,
+		Fields:    format.Fields,
 		SubmitURL: template.URL(HTTPURL + "/" + pFormat + "/save"),
 	}
 	return "edit", tData
@@ -58,14 +49,14 @@ func EditNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 func SaveNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 	submittedValues map[string]string) (string, interface{}) {
 
-	format, err := db.GetFormat(ctx, pFormat)
-	if err != nil {
-		log.Printf("couldn't get format \"%v\": %v\n", pFormat, err)
+	format, found := formats.Get(pFormat)
+	if !found {
+		log.Printf("couldn't find format \"%v\"", pFormat)
 		return "", nil
 	}
 
-	tplFields, validationFailed := validatedFieldsWithValue(format,
-		submittedValues)
+	tplFields, validationFailed := format.ValidatedFieldsWithValue(
+		ctx, submittedValues)
 
 	if !validationFailed {
 		dbID, err := db.AddRecord(ctx, pFormat, submittedValues)
@@ -77,7 +68,7 @@ func SaveNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 		return tplName, tplData
 	} else {
 		tData := TemplateForm{
-			Name:      format.Name,
+			Name:      format.Label,
 			Fields:    tplFields,
 			SubmitURL: template.URL(HTTPURL + "/" + pFormat + "/save"),
 		}
@@ -92,9 +83,9 @@ func SaveNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 func EditExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 	_submittedValues map[string]string) (string, interface{}) {
 
-	format, err := db.GetFormat(ctx, pFormat)
-	if err != nil {
-		log.Printf("couldn't get format \"%v\": %v\n", pFormat, err)
+	format, found := formats.Get(pFormat)
+	if !found {
+		log.Printf("couldn't find format \"%v\"", pFormat)
 		return "", nil
 	}
 
@@ -105,10 +96,10 @@ func EditExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 		return tplName, tplData
 	}
 
-	tplFields, _ := validatedFieldsWithValue(format, record.FieldValues)
+	tplFields, _ := format.ValidatedFieldsWithValue(ctx, record.FieldValues)
 
 	tData := TemplateForm{
-		Name:   format.Name,
+		Name:   format.Label,
 		Fields: tplFields,
 		SubmitURL: template.URL(
 			HTTPURL + "/" + pFormat + "/" + record.DbID + "/save"),
@@ -120,13 +111,13 @@ func EditExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 func SaveExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 	submittedValues map[string]string) (string, interface{}) {
 
-	format, err := db.GetFormat(ctx, pFormat)
-	if err != nil {
-		log.Printf("couldn't get format \"%v\": %v\n", pFormat, err)
+	format, found := formats.Get(pFormat)
+	if !found {
+		log.Printf("couldn't find format \"%v\"", pFormat)
 		return "", nil
 	}
 
-	tplFields, validationFailed := validatedFieldsWithValue(format,
+	tplFields, validationFailed := format.ValidatedFieldsWithValue(ctx,
 		submittedValues)
 
 	if !validationFailed {
@@ -142,7 +133,7 @@ func SaveExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 		return tplName, tplData
 	} else {
 		tData := TemplateForm{
-			Name:   format.Name,
+			Name:   format.Label,
 			Fields: tplFields,
 			SubmitURL: template.URL(
 				HTTPURL + "/" + pFormat + "/" + pRecord + "/save"),
@@ -156,9 +147,9 @@ func SaveExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 func View(ctx context.Context, db database.DB, pFormat, pRecord string,
 	_submittedValues map[string]string) (string, interface{}) {
 
-	format, err := db.GetFormat(ctx, pFormat)
-	if err != nil {
-		log.Printf("couldn't get format \"%v\": %v\n", pFormat, err)
+	format, found := formats.Get(pFormat)
+	if !found {
+		log.Printf("couldn't find format \"%v\"", pFormat)
 		return "", nil
 	}
 
@@ -171,7 +162,7 @@ func View(ctx context.Context, db database.DB, pFormat, pRecord string,
 
 	tData := TemplateRecord{
 		URL:         HTTPURL + "/" + pFormat + "/" + pRecord,
-		FieldValues: labelValues(format, record.FieldValues),
+		FieldValues: format.LabelValues(record.FieldValues),
 	}
 	return "view", tData
 }
@@ -188,64 +179,6 @@ func List(ctx context.Context, db database.DB, pFormat, _pRecord string,
 
 	tData := templateRecords(records, HTTPURL+"/"+pFormat+"/")
 	return "list", tData
-}
-
-// templateFields takes a format and returns a slice of TemplateField
-func templateFields(format *database.Format) []TemplateField {
-
-	fieldsWithValue := make([]TemplateField, len(format.Fields),
-		len(format.Fields))
-	for index, field := range format.Fields {
-		fieldsWithValue[index].Name = field.Name
-		fieldsWithValue[index].Label = field.Label
-		fieldsWithValue[index].Description = field.Description
-		fieldsWithValue[index].Value = ""
-	}
-	return fieldsWithValue
-}
-
-// validatedFieldsWithValue takes a format and a slice of field values and
-// returns a slice of TemplateField with the values and results of validation
-func validatedFieldsWithValue(format *database.Format,
-	fieldValues map[string]string) (tplFields []TemplateField,
-	valFailed bool) {
-
-	tplFields = make([]TemplateField, len(format.Fields),
-		len(format.Fields))
-	valFailed = false
-
-	for index, field := range format.Fields {
-		tplFields[index].Name = field.Name
-		tplFields[index].Label = field.Label
-		tplFields[index].Description = field.Description
-		// If there is a value for the field
-		if value, found := fieldValues[field.Name]; found {
-			tplFields[index].Value = value
-			// If there is no validator or validation passed
-			if field.Validator == nil ||
-				field.Validator.Validate(value) {
-
-				tplFields[index].ValidationFailed = false
-			} else {
-				// Validation failed
-				tplFields[index].ValidationFailed = true
-				valFailed = true
-			}
-		}
-	}
-	return tplFields, valFailed
-}
-
-// labelValues takes a format and a slice of field values and returns a map of
-// the field labels with the values
-func labelValues(format *database.Format,
-	fieldValues map[string]string) map[string]string {
-
-	labelValues := make(map[string]string)
-	for _, field := range format.Fields {
-		labelValues[field.Label] = fieldValues[field.Name]
-	}
-	return labelValues
 }
 
 // templateRecords takes a slice of records (authors, books...) and returns

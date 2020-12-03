@@ -9,8 +9,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-
-	"github.com/ivanmartinez/boocat/validators"
 )
 
 const (
@@ -24,23 +22,6 @@ type Record struct {
 	FieldValues map[string]string // Fields and values of the record
 }
 
-// Format defines a form the create or update records (authors, books...),
-// including the allowed values for the fields. As a consequence, it defines
-// the fields and allowed values of the records.
-type Format struct {
-	Name   string        // ID
-	Fields []FormatField // Fields of the format
-}
-
-// FormatField defines defines a form field, together with the
-// allowed values
-type FormatField struct {
-	Name        string               // ID
-	Label       string               // Display name
-	Description string               // Text description
-	Validator   validators.Validator // Regular expression to validate the values
-}
-
 // DB is the database interface
 type DB interface {
 	AddRecord(ctx context.Context, format string,
@@ -48,11 +29,10 @@ type DB interface {
 	UpdateRecord(ctx context.Context, format string, record Record) error
 	GetAllRecords(ctx context.Context, format string) ([]Record, error)
 	GetRecord(ctx context.Context, format, id string) (*Record, error)
-	GetFormat(ctx context.Context, id string) (*Format, error)
 }
 
-// MongoDB database
-type MongoDB struct {
+// mongoDB database
+type mongoDB struct {
 	// MongoDB client
 	client *mongo.Client
 	// Map of collections. Every collection contains the records of a format
@@ -63,7 +43,7 @@ type MongoDB struct {
 // Connect connects to the database and initializes the collections
 // @TODO: Maybe the initialization of collections should be separated
 func Connect(ctx context.Context, dbURI *string,
-	formats []string) *MongoDB {
+	formats []string) *mongoDB {
 
 	// Create and connect the client
 	cli, err := mongo.NewClient(options.Client().ApplyURI(*dbURI))
@@ -82,20 +62,20 @@ func Connect(ctx context.Context, dbURI *string,
 		collections[format] = db.Collection(format)
 	}
 
-	return &MongoDB{
+	return &mongoDB{
 		client:      cli,
 		collections: collections,
 	}
 }
 
 // Disconnect disconnects the database
-func (db *MongoDB) Disconnect(ctx context.Context) {
+func (db *mongoDB) Disconnect(ctx context.Context) {
 	db.client.Disconnect(ctx)
 }
 
 // AddRecord adds a new record (author, book...) with the given field values to
 // the database
-func (db *MongoDB) AddRecord(ctx context.Context, format string,
+func (db *mongoDB) AddRecord(ctx context.Context, format string,
 	values map[string]string) (string, error) {
 
 	// If there is a collection for the format
@@ -113,7 +93,7 @@ func (db *MongoDB) AddRecord(ctx context.Context, format string,
 
 // Update updates a database record (author, book...) with the given
 // field values
-func (db *MongoDB) UpdateRecord(ctx context.Context, format string,
+func (db *mongoDB) UpdateRecord(ctx context.Context, format string,
 	record Record) error {
 
 	// If there is a collection for the format
@@ -130,7 +110,7 @@ func (db *MongoDB) UpdateRecord(ctx context.Context, format string,
 }
 
 // GetAll returns all records of a specific format from the database
-func (db *MongoDB) GetAllRecords(ctx context.Context,
+func (db *mongoDB) GetAllRecords(ctx context.Context,
 	format string) ([]Record, error) {
 
 	// If there is a collection for the format
@@ -156,7 +136,7 @@ func (db *MongoDB) GetAllRecords(ctx context.Context,
 }
 
 // Get returns a record from the database
-func (db *MongoDB) GetRecord(ctx context.Context, format,
+func (db *mongoDB) GetRecord(ctx context.Context, format,
 	id string) (*Record, error) {
 
 	// If there is a collection for the format
@@ -177,57 +157,6 @@ func (db *MongoDB) GetRecord(ctx context.Context, format,
 	}
 
 	return nil, errors.New("format not found")
-}
-
-// GetFormat returns a format
-func (db *MongoDB) GetFormat(ctx context.Context, id string) (*Format, error) {
-	if id == "author" {
-		nameValidator, _ := validators.NewRegExpValidator(
-			"^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
-		nameField := FormatField{
-			Name:        "name",
-			Label:       "Name",
-			Description: "A-Z,a-z",
-			Validator:   nameValidator,
-		}
-		birthdateValidator, _ := validators.NewRegExpValidator("^[1|2][0-9]{3}$")
-		birthdateField := FormatField{
-			Name:        "birthdate",
-			Label:       "Year of birth",
-			Description: "A year",
-			Validator:   birthdateValidator,
-		}
-
-		return &Format{
-			Name:   "author",
-			Fields: []FormatField{nameField, birthdateField},
-		}, nil
-
-	} else if id == "book" {
-		nameValidator, _ := validators.NewRegExpValidator(
-			"^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
-		nameField := FormatField{
-			Name:        "name",
-			Label:       "Name",
-			Description: "A-Z,a-z",
-			Validator:   nameValidator,
-		}
-		yearValidator, _ := validators.NewRegExpValidator("^[1|2][0-9]{3}$")
-		yearField := FormatField{
-			Name:        "year",
-			Label:       "Year",
-			Description: "A year",
-			Validator:   yearValidator,
-		}
-
-		return &Format{
-			Name:   "book",
-			Fields: []FormatField{nameField, yearField},
-		}, nil
-
-	} else {
-		return nil, errors.New("format not found")
-	}
 }
 
 // documentsToRecords converts a slice of MongoDB documents into a slice of

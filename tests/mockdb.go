@@ -6,8 +6,6 @@ import (
 	"strconv"
 
 	"github.com/ivanmartinez/boocat/database"
-
-	"github.com/ivanmartinez/boocat/validators"
 )
 
 // MockDB is a database mock for testing
@@ -110,59 +108,6 @@ func (db *MockDB) GetRecord(ctx context.Context, format,
 	}
 
 	return nil, fmt.Errorf("unknown record %v", id)
-}
-
-// GetFormat returns a format
-func (db *MockDB) GetFormat(ctx context.Context,
-	id string) (*database.Format, error) {
-	//@TDOO: This is a mock-up
-	if id == "author" {
-		nameValidator, _ := validators.NewRegExpValidator(
-			"^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
-		nameField := database.FormatField{
-			Name:        "name",
-			Label:       "Name",
-			Description: "A-Z,a-z",
-			Validator:   nameValidator,
-		}
-		birthdateValidator, _ := validators.NewRegExpValidator("^[1|2][0-9]{3}$")
-		birthdateField := database.FormatField{
-			Name:        "birthdate",
-			Label:       "Year of birth",
-			Description: "A year",
-			Validator:   birthdateValidator,
-		}
-
-		return &database.Format{
-			Name:   "author",
-			Fields: []database.FormatField{nameField, birthdateField},
-		}, nil
-
-	} else if id == "book" {
-		nameValidator, _ := validators.NewRegExpValidator(
-			"^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
-		nameField := database.FormatField{
-			Name:        "name",
-			Label:       "Name",
-			Description: "A-Z,a-z",
-			Validator:   nameValidator,
-		}
-		yearValidator, _ := validators.NewRegExpValidator("^[1|2][0-9]{3}$")
-		yearField := database.FormatField{
-			Name:        "year",
-			Label:       "Year",
-			Description: "A year",
-			Validator:   yearValidator,
-		}
-
-		return &database.Format{
-			Name:   "book",
-			Fields: []database.FormatField{nameField, yearField},
-		}, nil
-
-	} else {
-		return &database.Format{}, nil
-	}
 }
 
 // LastID takes a format and returns the database ID of the last record of

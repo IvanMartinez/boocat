@@ -13,6 +13,7 @@ import (
 
 	"github.com/ivanmartinez/boocat"
 	"github.com/ivanmartinez/boocat/database"
+	"github.com/ivanmartinez/boocat/formats"
 	"github.com/ivanmartinez/boocat/templates"
 )
 
@@ -46,6 +47,7 @@ func startHTTPServer(ctx context.Context, db database.DB, url string) {
 	// @TODO: Find the actual URL, it could be using https
 	boocat.HTTPURL = "http://" + url
 	templates.LoadAll()
+	formats.Initialize(db)
 
 	// Gorilla mux router allows us to use patterns in paths
 	router := mux.NewRouter()
