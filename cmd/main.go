@@ -14,7 +14,7 @@ import (
 	"github.com/ivanmartinez/boocat"
 	"github.com/ivanmartinez/boocat/database"
 	"github.com/ivanmartinez/boocat/formats"
-	"github.com/ivanmartinez/boocat/templates"
+	"github.com/ivanmartinez/boocat/webfiles"
 )
 
 func main() {
@@ -46,7 +46,7 @@ func main() {
 func startHTTPServer(ctx context.Context, db database.DB, url string) {
 	// @TODO: Find the actual URL, it could be using https
 	boocat.HTTPURL = "http://" + url
-	templates.LoadAll()
+	webfiles.Load()
 	formats.Initialize(db)
 
 	// Gorilla mux router allows us to use patterns in paths
@@ -111,11 +111,11 @@ func makeHandler(tplHandler func(context.Context, database.DB, string, string,
 			submittedValues)
 
 		// Get the template to generate the output
-		tpl, found := templates.Get(tplName)
+		webFile, found := webfiles.Get(tplName)
 		if found {
 			// Generate the output with the template and the result of the
 			// operation
-			err := tpl.Execute(w, tplData)
+			err := webFile.Write(w, tplData)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}

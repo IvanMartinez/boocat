@@ -42,7 +42,7 @@ func EditNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 		Fields:    format.Fields,
 		SubmitURL: template.URL(HTTPURL + "/" + pFormat + "/save"),
 	}
-	return "edit", tData
+	return "/edit", tData
 }
 
 // SaveNew saves (creates) a new record (author, book, etc)
@@ -73,7 +73,7 @@ func SaveNew(ctx context.Context, db database.DB, pFormat, _pRecord string,
 			SubmitURL: template.URL(HTTPURL + "/" + pFormat + "/save"),
 		}
 
-		return "edit", tData
+		return "/edit", tData
 	}
 }
 
@@ -104,7 +104,7 @@ func EditExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 		SubmitURL: template.URL(
 			HTTPURL + "/" + pFormat + "/" + record.DbID + "/save"),
 	}
-	return "edit", tData
+	return "/edit", tData
 }
 
 // SaveExisting saves (updates) a existing record (author, book...)
@@ -139,7 +139,7 @@ func SaveExisting(ctx context.Context, db database.DB, pFormat, pRecord string,
 				HTTPURL + "/" + pFormat + "/" + pRecord + "/save"),
 		}
 
-		return "edit", tData
+		return "/edit", tData
 	}
 }
 
@@ -164,7 +164,7 @@ func View(ctx context.Context, db database.DB, pFormat, pRecord string,
 		URL:         HTTPURL + "/" + pFormat + "/" + pRecord,
 		FieldValues: format.LabelValues(record.FieldValues),
 	}
-	return "view", tData
+	return "/view", tData
 }
 
 // List returns the data to generate a HTML list of records (authors, books...)
@@ -178,7 +178,7 @@ func List(ctx context.Context, db database.DB, pFormat, _pRecord string,
 	}
 
 	tData := templateRecords(records, HTTPURL+"/"+pFormat+"/")
-	return "list", tData
+	return "/list", tData
 }
 
 // templateRecords takes a slice of records (authors, books...) and returns

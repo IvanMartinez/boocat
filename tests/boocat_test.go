@@ -67,8 +67,8 @@ func TestEditNew(t *testing.T) {
 	form := tplData.(boocat.TemplateForm)
 
 	// Check the template
-	if tplName != "edit" {
-		t.Errorf("expected template \"edit\" but got \"%v\"", tplName)
+	if tplName != "/edit" {
+		t.Errorf("expected template \"/edit\" but got \"%v\"", tplName)
 	}
 	// Check the form
 	if err := checkForm(form, "Author", "/author/save", 3); err != nil {
@@ -99,8 +99,8 @@ func TestSaveNew(t *testing.T) {
 	record := tplData.(boocat.TemplateRecord)
 
 	// Check the template
-	if tplName != "view" {
-		t.Errorf("expected template \"view\" but got \"%v\"", tplName)
+	if tplName != "/view" {
+		t.Errorf("expected template \"/view\" but got \"%v\"", tplName)
 	}
 	// Check the record
 	if err := checkTemplateRecord(record,
@@ -130,8 +130,8 @@ func TestSaveNewValidationFail(t *testing.T) {
 	form := tplData.(boocat.TemplateForm)
 
 	// Check the template
-	if tplName != "edit" {
-		t.Errorf("expected template \"edit\" but got \"%v\"", tplName)
+	if tplName != "/edit" {
+		t.Errorf("expected template \"/edit\" but got \"%v\"", tplName)
 	}
 	// Check the form
 	if err := checkForm(form, "Author", "/author/save", 3); err != nil {
@@ -163,8 +163,8 @@ func TestEditExisting(t *testing.T) {
 	form := tplData.(boocat.TemplateForm)
 
 	// Check the template
-	if tplName != "edit" {
-		t.Errorf("expected template \"edit\" but got \"%v\"", tplName)
+	if tplName != "/edit" {
+		t.Errorf("expected template \"/edit\" but got \"%v\"", tplName)
 	}
 	// Check the form
 	if err := checkForm(form, "Book", "/book/"+db.LastID("book")+"/save",
@@ -194,8 +194,8 @@ func TestEditExistingValidationFail(t *testing.T) {
 	form := tplData.(boocat.TemplateForm)
 
 	// Check the template
-	if tplName != "edit" {
-		t.Errorf("expected template \"edit\" but got \"%v\"", tplName)
+	if tplName != "/edit" {
+		t.Errorf("expected template \"/edit\" but got \"%v\"", tplName)
 	}
 	// Check the form
 	if err := checkForm(form, "Author", "/author/"+db.LastID("author")+"/save",
@@ -233,8 +233,8 @@ func TestSaveExisting(t *testing.T) {
 	record := tplData.(boocat.TemplateRecord)
 
 	// Check the template
-	if tplName != "view" {
-		t.Errorf("expected template \"view\" but got \"%v\"", tplName)
+	if tplName != "/view" {
+		t.Errorf("expected template \"/view\" but got \"%v\"", tplName)
 	}
 	// Find the record with the expected URL
 	if err := checkTemplateRecord(record,
@@ -267,8 +267,8 @@ func TestSaveExistingValidationFail(t *testing.T) {
 	form := tplData.(boocat.TemplateForm)
 
 	// Check the template
-	if tplName != "edit" {
-		t.Errorf("expected template \"edit\" but got \"%v\"", tplName)
+	if tplName != "/edit" {
+		t.Errorf("expected template \"/edit\" but got \"%v\"", tplName)
 	}
 	// Check the form
 	if err := checkForm(form, "Book", "/book/book1/save", 4); err != nil {
@@ -307,8 +307,8 @@ func TestView(t *testing.T) {
 	record := tplData.(boocat.TemplateRecord)
 
 	// Check the template
-	if tplName != "view" {
-		t.Errorf("expected template \"view\" but got \"%v\"", tplName)
+	if tplName != "/view" {
+		t.Errorf("expected template \"/view\" but got \"%v\"", tplName)
 	}
 
 	// Check the record
@@ -335,8 +335,8 @@ func TestList(t *testing.T) {
 	records := tplData.([]boocat.TemplateRecord)
 
 	// Check the template
-	if tplName != "list" {
-		t.Errorf("expected template \"list\" but got \"%v\"", tplName)
+	if tplName != "/list" {
+		t.Errorf("expected template \"/list\" but got \"%v\"", tplName)
 	}
 	// Check the number of records in the returned list data
 	if len(records) != 4 {
