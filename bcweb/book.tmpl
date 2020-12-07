@@ -1,0 +1,5 @@
+<h1>Book {{.URL}}</h1>
+
+{{range $key, $value := .FieldValues}}
+    <div>{{$key}} : {{$value}}</div>
+{{end}}

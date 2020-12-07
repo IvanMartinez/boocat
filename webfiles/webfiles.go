@@ -1,46 +1,64 @@
 package webfiles
 
 import (
-	"fmt"
 	"html/template"
-	"io"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"path/filepath"
 	"strings"
 )
 
 // rootPath is where the website files are
-const rootPath = "html/"
+const rootPath = "bcweb/"
 
-type WebFile interface {
-	Write(w io.Writer, data interface{}) error
-}
-
-type goTemplate struct {
+type Template struct {
 	template *template.Template
 }
 
-func (gotpl *goTemplate) Write(w io.Writer, data interface{}) error {
-	return gotpl.template.Execute(w, data)
+type StaticFile struct {
+	content []byte
 }
 
 // webfiles is the map of webfiles to generate HTML pages
 // @TODO add sync.RWMutex for concurrent access
-var webFiles map[string]WebFile
+var templates map[string]*Template
+
+// webfiles is the map of webfiles to generate HTML pages
+// @TODO add sync.RWMutex for concurrent access
+var staticFiles map[string]*StaticFile
+
+// Write executes the template with data and writes the result to w
+func (goTpl *Template) Write(w http.ResponseWriter, data interface{}) error {
+	return goTpl.template.Execute(w, data)
+}
+
+// Write writes the contents of the file to w
+func (sFile *StaticFile) Write(w http.ResponseWriter) error {
+	//@TODO: MIME types
+	_, err := w.Write(sFile.content)
+	return err
+}
 
 // Load loads all webfiles from the files in rootPath and all the
 // subirectories recursively
 func Load() {
-	webFiles = make(map[string]WebFile)
+	templates = make(map[string]*Template)
+	staticFiles = make(map[string]*StaticFile)
 
 	loadDir("")
 }
 
-// Get returns a template by its path inside rootPath
-func Get(path string) (WebFile, bool) {
-	template, found := webFiles[path]
+// GetTemplate returns a template by its path inside rootPath
+func GetTemplate(path string) (*Template, bool) {
+	template, found := templates[path]
 	return template, found
+}
+
+// GetFile returns a static file by its path inside rootPath
+func GetFile(path string) (*StaticFile, bool) {
+	file, found := staticFiles[path]
+	return file, found
 }
 
 func loadDir(path string) {
@@ -62,16 +80,33 @@ func loadDir(path string) {
 func loadFile(path string) {
 	ext := strings.TrimPrefix(filepath.Ext(path), ".")
 
-	if ext == "tmpl" {
+	switch {
+	case ext == "tmpl":
 		tmpl, err := template.ParseFiles(rootPath + path)
 		if err != nil {
 			log.Fatal(err)
 		}
-
-		fmt.Printf("new path %v\n", strings.TrimSuffix(path, filepath.Ext(path)))
-		webFiles[strings.TrimSuffix(path, filepath.Ext(path))] =
-			&goTemplate{
+		templates[strings.TrimSuffix(path, filepath.Ext(path))] =
+			&Template{
 				template: tmpl,
+			}
+	case (ext == "htm") || (ext == "html"):
+		content, err := ioutil.ReadFile(rootPath + path)
+		if err != nil {
+			log.Fatal(err)
+		}
+		staticFiles[strings.TrimSuffix(path, filepath.Ext(path))] =
+			&StaticFile{
+				content: content,
+			}
+	default:
+		content, err := ioutil.ReadFile(rootPath + path)
+		if err != nil {
+			log.Fatal(err)
+		}
+		staticFiles[path] =
+			&StaticFile{
+				content: content,
 			}
 	}
 }
