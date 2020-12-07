@@ -12,19 +12,21 @@ import (
 // rootPath is where the website files are
 const rootPath = "bcweb/"
 
+// Template contains a template.Template to generate output
 type Template struct {
 	template *template.Template
 }
 
+// StaticFile contains the contents of a static file
 type StaticFile struct {
 	content []byte
 }
 
-// webfiles is the map of webfiles to generate HTML pages
+// templates is the map of templates to generate HTML pages of the website
 // @TODO add sync.RWMutex for concurrent access
 var templates map[string]*Template
 
-// webfiles is the map of webfiles to generate HTML pages
+// staticFiles is the map of static files of the website
 // @TODO add sync.RWMutex for concurrent access
 var staticFiles map[string]*StaticFile
 
