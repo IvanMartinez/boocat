@@ -60,9 +60,10 @@ func TestEditNew(t *testing.T) {
 	// Initialize formats and database
 	db := initializedDB()
 	formats.Initialize(db)
+	boocat.DB = db
 
 	// Run EditNew for author format
-	tplName, tplData := boocat.EditNew(context.TODO(), db, "author", "",
+	tplName, tplData := boocat.EditNew(context.TODO(), "author", "",
 		nil)
 	form := tplData.(boocat.TemplateForm)
 
@@ -87,9 +88,10 @@ func TestSaveNew(t *testing.T) {
 	// Initialize formats and database
 	db := initializedDB()
 	formats.Initialize(db)
+	boocat.DB = db
 
 	// Run SaveNew with a new book
-	tplName, tplData := boocat.SaveNew(context.TODO(), db, "book", "",
+	tplName, tplData := boocat.SaveNew(context.TODO(), "book", "",
 		map[string]string{
 			"name":     "The Wind-Up Bird Chronicle",
 			"year":     "1995",
@@ -120,9 +122,10 @@ func TestSaveNewValidationFail(t *testing.T) {
 	// Initialize formats and database
 	db := initializedDB()
 	formats.Initialize(db)
+	boocat.DB = db
 
 	// Run SaveNew with a new author
-	tplName, tplData := boocat.SaveNew(context.TODO(), db, "author", "",
+	tplName, tplData := boocat.SaveNew(context.TODO(), "author", "",
 		map[string]string{
 			"name":      "miguel de cervantes saavedra",
 			"birthdate": "",
@@ -156,9 +159,10 @@ func TestEditExisting(t *testing.T) {
 	// Initialize formats and database
 	db := initializedDB()
 	formats.Initialize(db)
+	boocat.DB = db
 
 	// Run EditExisting with the last book in the database
-	tplName, tplData := boocat.EditExisting(context.TODO(), db, "book",
+	tplName, tplData := boocat.EditExisting(context.TODO(), "book",
 		"book4", nil)
 	form := tplData.(boocat.TemplateForm)
 
@@ -187,9 +191,10 @@ func TestEditExistingValidationFail(t *testing.T) {
 	// Initialize formats and database
 	db := initializedDB()
 	formats.Initialize(db)
+	boocat.DB = db
 
 	// Run EditExisting with the last book in the database
-	tplName, tplData := boocat.EditExisting(context.TODO(), db, "author",
+	tplName, tplData := boocat.EditExisting(context.TODO(), "author",
 		db.LastID("author"), nil)
 	form := tplData.(boocat.TemplateForm)
 
@@ -222,9 +227,10 @@ func TestSaveExisting(t *testing.T) {
 	// Initialize formats and database
 	db := initializedDB()
 	formats.Initialize(db)
+	boocat.DB = db
 
 	// Run SaveExisting with a new author
-	tplName, tplData := boocat.SaveExisting(context.TODO(), db, "author",
+	tplName, tplData := boocat.SaveExisting(context.TODO(), "author",
 		db.LastID("author"),
 		map[string]string{
 			"name":      "Simone De Beauvoir",
@@ -255,9 +261,10 @@ func TestSaveExistingValidationFail(t *testing.T) {
 	// Initialize formats and database
 	db := initializedDB()
 	formats.Initialize(db)
+	boocat.DB = db
 
 	// Run SaveExisting with a new author
-	tplName, tplData := boocat.SaveExisting(context.TODO(), db, "book",
+	tplName, tplData := boocat.SaveExisting(context.TODO(), "book",
 		"book1",
 		map[string]string{
 			"name":   "the road to wigan pier",
@@ -294,76 +301,64 @@ func TestSaveExistingValidationFail(t *testing.T) {
 	}
 }
 
-// TestView tests boocat.View
-func TestView(t *testing.T) {
+// TestGetRecord tests getting one record
+func TestGetRecord(t *testing.T) {
 	// Initialize formats and database
 	db := initializedDB()
 	formats.Initialize(db)
+	boocat.DB = db
 
-	// Run View with the last author in the database
-	tplName, tplData := boocat.View(context.TODO(), db, "author",
-		"author2", nil)
-
-	record := tplData.(boocat.TemplateRecord)
-
-	// Check the template
-	if tplName != "/view" {
-		t.Errorf("expected template \"/view\" but got \"%v\"", tplName)
-	}
+	// Get the last author
+	params := map[string]string{"id": "author2"}
+	data := boocat.Get(context.TODO(), "author", params)
+	record := data.(map[string]string)
 
 	// Check the record
-	if err := checkTemplateRecord(record, "/author/author2",
+	if diff := compareRecords(record,
 		map[string]string{
-			"Name":          "George Orwell",
-			"Year of birth": "1903",
-			"Biography":     "English",
-		}); err != nil {
-
-		t.Error(err)
+			"id":        "author2",
+			"name":      "George Orwell",
+			"birthdate": "1903",
+			"biography": "English",
+		}); diff != "" {
+		t.Error(diff)
 	}
 }
 
-// TestList tests boocat.List
-func TestList(t *testing.T) {
+// TestList tests getting all records of a format
+func TestListRecords(t *testing.T) {
 	// Initialize formats and database
 	db := initializedDB()
 	formats.Initialize(db)
-
-	// Run List for book format
-	tplName, tplData := boocat.List(context.TODO(), db, "book", "",
-		nil)
-	records := tplData.([]boocat.TemplateRecord)
-
-	// Check the template
-	if tplName != "/list" {
-		t.Errorf("expected template \"/list\" but got \"%v\"", tplName)
-	}
+	boocat.DB = db
+	// Get all records
+	data := boocat.Get(context.TODO(), "book", nil)
+	records := data.([]map[string]string)
 	// Check the number of records in the returned list data
 	if len(records) != 4 {
 		t.Errorf("expected 4 records but got %v", len(records))
 	}
-	// Find one record with the expected URL
-	if err := findCheckTemplateRecord(records, "/book/book1",
+	// Find this record
+	if diff := findCompareRecord(records,
 		map[string]string{
+			"id":       "book1",
 			"name":     "Norwegian Wood",
 			"year":     "1987",
 			"synopsis": "novel",
 			"author":   "author1",
-		}); err != nil {
-
-		t.Error(err)
+		}); diff != "" {
+		t.Error(diff)
 	}
-
-	// Find another record with the expected URL
-	if err := findCheckTemplateRecord(records, "/book/book2",
+	// Find this other record
+	if diff := findCompareRecord(records,
 		map[string]string{
+			"id":       "book2",
 			"name":     "Kafka On The Shore",
 			"year":     "2002",
 			"synopsis": "novel",
 			"author":   "author1",
-		}); err != nil {
-
-		t.Error(err)
+		}); diff != "" {
+		t.Error(diff)
 	}
 }
 
@@ -430,7 +425,7 @@ func findCheckTemplateRecord(records []boocat.TemplateRecord, URL string,
 	expectedValues map[string]string) error {
 
 	if record := findTemplateRecord(records, URL); record != nil {
-		return checkFieldValues(record.FieldValues, expectedValues)
+		return fmt.Errorf(compareRecords(record.FieldValues, expectedValues))
 	}
 
 	return fmt.Errorf("couldn't find record with URL \"%v\"", URL)
@@ -458,27 +453,36 @@ func checkTemplateRecord(record boocat.TemplateRecord, url string,
 			record.URL, url)
 	}
 
-	return checkFieldValues(record.FieldValues, expectedValues)
+	return fmt.Errorf(compareRecords(record.FieldValues, expectedValues))
 }
 
-// checkFieldValues compares two maps of field-value pairs
-func checkFieldValues(values, expectedValues map[string]string) error {
-	if len(values) != len(expectedValues) {
-		return fmt.Errorf("unexpected number of %v fields should be %v",
-			len(values), len(expectedValues))
+func findCompareRecord(records []map[string]string, expectedRecord map[string]string) string {
+	if expectedId, found := expectedRecord["id"]; found {
+		for _, record := range records {
+			if record["id"] == expectedId {
+				return compareRecords(record, expectedRecord)
+			}
+		}
+		return fmt.Sprintf("couldn't find record with id \"%v\"\n", expectedId)
 	}
+	return "expected record doesn't have id"
+}
 
-	for name, value := range values {
-		if expectedValue, found := expectedValues[name]; found {
-			if value != expectedValue {
-				return fmt.Errorf(
-					"unexpected field \"%v\" value \"%v\" should be \"%v\"",
-					name, value, expectedValue)
+// compareRecords compares two records
+func compareRecords(record1, record2 map[string]string) string {
+	if len(record1) != len(record2) {
+		return fmt.Sprintf("first record has %v fields and second has %v", len(record1), len(record2))
+	}
+	for name, value1 := range record1 {
+		if value2, found := record2[name]; found {
+			if value1 != value2 {
+				return fmt.Sprintf(
+					"field \"%v\" has value \"%v\" in first record and \"%v\" in second",
+					name, value1, value2)
 			}
 		} else {
-			return fmt.Errorf("unexpected field \"%v\"", name)
+			return fmt.Sprintf("second record doesn't have field \"%v\"", name)
 		}
 	}
-
-	return nil
+	return ""
 }

@@ -15,20 +15,12 @@ const (
 	dbName = "boocat"
 )
 
-// Record represents the data of an entity, currently author or book
-// @TODO: Remove this type?
-type Record struct {
-	DbID        string            // ID of the record in the database
-	FieldValues map[string]string // Fields and values of the record
-}
-
 // DB is the database interface
 type DB interface {
-	AddRecord(ctx context.Context, format string,
-		fields map[string]string) (string, error)
-	UpdateRecord(ctx context.Context, format string, record Record) error
-	GetAllRecords(ctx context.Context, format string) ([]Record, error)
-	GetRecord(ctx context.Context, format, id string) (*Record, error)
+	AddRecord(ctx context.Context, format string, record map[string]string) (string, error)
+	UpdateRecord(ctx context.Context, format string, record map[string]string) error
+	GetAllRecords(ctx context.Context, format string) ([]map[string]string, error)
+	GetRecord(ctx context.Context, format, id string) (map[string]string, error)
 }
 
 // mongoDB database
@@ -42,8 +34,7 @@ type mongoDB struct {
 
 // Connect connects to the database and initializes the collections
 // @TODO: Maybe the initialization of collections should be separated
-func Connect(ctx context.Context, dbURI *string,
-	formats []string) *mongoDB {
+func Connect(ctx context.Context, dbURI *string, formats []string) *mongoDB {
 
 	// Create and connect the client
 	cli, err := mongo.NewClient(options.Client().ApplyURI(*dbURI))
@@ -73,111 +64,91 @@ func (db *mongoDB) Disconnect(ctx context.Context) {
 	db.client.Disconnect(ctx)
 }
 
-// AddRecord adds a new record (author, book...) with the given field values to
-// the database
-func (db *mongoDB) AddRecord(ctx context.Context, format string,
-	values map[string]string) (string, error) {
-
-	// If there is a collection for the format
+// AddRecord adds a new record (author, book...)
+func (db *mongoDB) AddRecord(ctx context.Context, format string, record map[string]string) (string, error) {
 	if col, found := db.collections[format]; found {
-		// Insert the record
-		if res, err := col.InsertOne(ctx, values); err == nil {
+		if _, found := record["id"]; found {
+			return "", errors.New("new record cannot have id")
+		}
+		if res, err := col.InsertOne(ctx, record); err == nil {
 			return res.InsertedID.(primitive.ObjectID).Hex(), err
 		} else {
 			return "", err
 		}
 	}
-
 	return "", errors.New("format not found")
 }
 
-// Update updates a database record (author, book...) with the given
-// field values
-func (db *mongoDB) UpdateRecord(ctx context.Context, format string,
-	record Record) error {
-
-	// If there is a collection for the format
+// Update updates a record (author, book...)
+func (db *mongoDB) UpdateRecord(ctx context.Context, format string, record map[string]string) error {
 	if col, found := db.collections[format]; found {
-		// Get ObjectID as used by MongoDB
-		objectID, _ := primitive.ObjectIDFromHex(record.DbID)
-		// Replace the record
-		_, err := col.ReplaceOne(ctx, bson.M{"_id": objectID},
-			record.FieldValues)
-		return err
+		if id, fields := splitID(record); id != "" {
+			// Get ObjectID as used by MongoDB
+			objectID, _ := primitive.ObjectIDFromHex(id)
+			_, err := col.ReplaceOne(ctx, bson.M{"_id": objectID},
+				fields)
+			return err
+		}
+		return errors.New("record doesn't have id")
 	}
-
 	return errors.New("format not found")
 }
 
 // GetAll returns all records of a specific format from the database
-func (db *mongoDB) GetAllRecords(ctx context.Context,
-	format string) ([]Record, error) {
-
-	// If there is a collection for the format
+func (db *mongoDB) GetAllRecords(ctx context.Context, format string) ([]map[string]string, error) {
 	if col, found := db.collections[format]; found {
-		// Get a cursor to read all the records
 		cursor, err := col.Find(context.TODO(), bson.M{})
 		if err != nil {
 			return nil, err
 		}
-
-		// Read all the records
 		var documents []map[string]string
 		if err = cursor.All(context.TODO(), &documents); err != nil {
 			return nil, err
 		}
-
-		// Convert to slice of Record
-		records := documentsToRecords(documents)
-		return records, nil
+		return documentsToRecords(documents), nil
 	}
-
 	return nil, errors.New("format not found")
 }
 
 // Get returns a record from the database
-func (db *mongoDB) GetRecord(ctx context.Context, format,
-	id string) (*Record, error) {
-
-	// If there is a collection for the format
+func (db *mongoDB) GetRecord(ctx context.Context, format, id string) (map[string]string, error) {
 	if col, found := db.collections[format]; found {
 		// Get ObjectID as used by MongoDB
 		objectID, _ := primitive.ObjectIDFromHex(id)
-		// Read the record
 		var document map[string]string
 		err := col.FindOne(context.TODO(),
 			bson.M{"_id": objectID}).Decode(&document)
 		if err != nil {
 			return nil, err
 		}
-
-		// Convert to Record
-		record := documentToRecord(document)
-		return &record, nil
+		return documentToRecord(document), nil
 	}
-
 	return nil, errors.New("format not found")
 }
 
-// documentsToRecords converts a slice of MongoDB documents into a slice of
-// Record
-func documentsToRecords(maps []map[string]string) (records []Record) {
-	records = make([]Record, 0, len(maps))
-	for _, m := range maps {
-		records = append(records, documentToRecord(m))
+func splitID(record map[string]string) (string, map[string]string) {
+	if id, found := record["id"]; found {
+		delete(record, "id")
+		return id, record
+	}
+	return "", record
+}
+
+// Return map[string]string slice from MongoDB document slice. It just renames "_id" keys to "id".
+func documentsToRecords(docs []map[string]string) []map[string]string {
+	records := make([]map[string]string, 0, len(docs))
+	for _, d := range docs {
+		records = append(records, documentToRecord(d))
 	}
 	return records
 }
 
-// documentToRecord converts a MongoDB document into a Record (author, book...)
-func documentToRecord(m map[string]string) (record Record) {
-	record.FieldValues = make(map[string]string)
-	for key, value := range m {
-		if key == "_id" {
-			record.DbID = value
-		} else {
-			record.FieldValues[key] = value
-		}
+// Return map[string]string from MongoDB document. It just renames "_id" key to "id".
+func documentToRecord(doc map[string]string) map[string]string {
+	if id, found := doc["_id"]; found {
+		delete(doc, "_id")
+		doc["id"] = id
+		return doc
 	}
-	return record
+	return doc
 }
