@@ -87,10 +87,10 @@ func shutdownServer(ctx context.Context, server *http.Server) {
 	- Get form to search records:       GET /{format}
 	- Show search result:               POST /{format}?search_criteria
 	- Get form to create new record:    GET /edit/{format}
-	- Get form to edit existing record: GET /edit/{format}?record
-	- Create new record:                POST /{format}
-	- Update existing record:           POST /{format}?record
-	- Show record:                      GET /{format}?record
+	- Get form to edit existing record: GET /edit/{format}?id=...
+	- Create new record:                POST .../{format}?...	// DIFFERENCE WITH SEARCH? id EMPTY?
+	- Update existing record:           POST .../{format}?id=...
+	- Show record:                      GET /{format}?id=...
 */
 
 func requestHandler(w http.ResponseWriter, r *http.Request) {
@@ -137,7 +137,6 @@ func handleTemplate(w http.ResponseWriter, r *http.Request, template *webfiles.T
 		// POST
 		data = boocat.Update(r.Context(), name, formValues)
 	}
-
 	err := template.Write(w, data)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

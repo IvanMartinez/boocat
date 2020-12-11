@@ -1,12 +1,9 @@
-<h1>Editing book {{.Name}}</h1>
+<h1>Editing book</h1>
 
-<form action="{{.SubmitURL}}" method="POST">
-{{range .Fields}}
-    <div>{{.Label}}<input type="text" id="{{.Name}}" name="{{.Name}}" value="{{.Value}}"/>
-        {{if .ValidationFailed}}
-        <div style="color:red;">{{.Description}}</div>
-        {{end}}
-    </div>
-{{end}}
-    <div><input type="submit" value="Save"/></div>
+<form action="/view/book" method="POST">
+<input type="hidden" id="id" name="id" value="{{.id}}">
+<div>Name: <input type="text" id="name" name="name" value="{{.name}}"/>
+<div>Year: <input type="text" id="year" name="year" value="{{.year}}"/>
+<div>Synopsis: <input type="text" id="synopsis" name="synopsis" value="{{.synopsis}}"/>
+<div><input type="submit" value="Save"/></div>
 </form>

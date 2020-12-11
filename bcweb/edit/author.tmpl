@@ -1,12 +1,10 @@
-<h1>Editing author {{.Name}}</h1>
 
-<form action="{{.SubmitURL}}" method="POST">
-{{range .Fields}}
-    <div>{{.Label}}<input type="text" id="{{.Name}}" name="{{.Name}}" value="{{.Value}}"/>
-        {{if .ValidationFailed}}
-        <div style="color:red;">{{.Description}}</div>
-        {{end}}
-    </div>
-{{end}}
-    <div><input type="submit" value="Save"/></div>
+<h1>Editing author</h1>
+
+<form action="/view/author" method="POST">
+<input type="hidden" id="id" name="id" value="{{.id}}">
+<div>Name: <input type="text" id="name" name="name" value="{{.name}}"/>
+<div>Year of birth: <input type="text" id="birthdate" name="birthdate" value="{{.birthdate}}"/>
+<div>Biography: <input type="text" id="biography" name="biography" value="{{.biography}}"/>
+<div><input type="submit" value="Save"/></div>
 </form>
