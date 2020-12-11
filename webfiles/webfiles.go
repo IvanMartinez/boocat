@@ -9,9 +9,6 @@ import (
 	"strings"
 )
 
-// rootPath is where the website files are
-const rootPath = "bcweb/"
-
 // Template contains a template.Template to generate output
 type Template struct {
 	template *template.Template
@@ -42,13 +39,11 @@ func (sFile *StaticFile) Write(w http.ResponseWriter) error {
 	return err
 }
 
-// Load loads all webfiles from the files in rootPath and all the
-// subirectories recursively
-func Load() {
+// Load loads all webfiles from the files in path and all the subirectories recursively
+func Load(path string) {
 	templates = make(map[string]*Template)
 	staticFiles = make(map[string]*StaticFile)
-
-	loadDir("")
+	loadDir(path, "")
 }
 
 // GetTemplate returns a template by its path inside rootPath
@@ -63,7 +58,7 @@ func GetFile(path string) (*StaticFile, bool) {
 	return file, found
 }
 
-func loadDir(path string) {
+func loadDir(rootPath, path string) {
 	files, err := ioutil.ReadDir(rootPath + path)
 	if err != nil {
 		log.Fatal(err)
@@ -71,15 +66,14 @@ func loadDir(path string) {
 
 	for _, file := range files {
 		if file.IsDir() {
-			loadDir(path + "/" + file.Name())
-		}
-		if !file.IsDir() {
-			loadFile(path + "/" + file.Name())
+			loadDir(rootPath, path+"/"+file.Name())
+		} else {
+			loadFile(rootPath, path+"/"+file.Name())
 		}
 	}
 }
 
-func loadFile(path string) {
+func loadFile(rootPath, path string) {
 	ext := strings.TrimPrefix(filepath.Ext(path), ".")
 
 	switch {
