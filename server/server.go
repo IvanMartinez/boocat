@@ -17,9 +17,9 @@ var (
 )
 
 // StartServer starts the server in url with files in path and database db
-func StartServer(ctx context.Context, url, path string, db database.DB) {
+func StartServer(ctx context.Context, url, path string, database database.DB) {
 	webfiles.Load(path)
-	db = db
+	db = database
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", Handle)

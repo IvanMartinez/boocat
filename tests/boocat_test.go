@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -84,6 +85,48 @@ func TestStaticFile(t *testing.T) {
 		t.Error(err)
 	} else if strings.TrimSpace(buf.String()) != "hello" {
 		t.Errorf("expected reading file with body \"hello\" but got \"%v\"", strings.TrimSpace(buf.String()))
+	}
+}
+
+//@TODO: Check that a tamplate has the name of a format. I'm going to leave this for later because I will
+// refactor this part.
+
+func TestGetRecord(t *testing.T) {
+	initialize()
+	req := httptest.NewRequest("GET", "/author?id=author1", nil)
+	res := handle(req)
+	if res.StatusCode != 200 {
+		t.Errorf("expected status code 200 but got %v", res.StatusCode)
+	}
+	resMap := decodeJSONBody(t, res.Body)
+	checkMap(t, resMap, map[string]string{
+		"name":      "Haruki Murakami",
+		"birthdate": "1949",
+		"biography": "Japanese"})
+}
+
+func decodeJSONBody(t *testing.T, reader io.ReadCloser) (m map[string]string) {
+	t.Helper()
+	defer reader.Close()
+	// Decode the JSON
+	decoder := json.NewDecoder(reader)
+
+	if err := decoder.Decode(&m); err != nil {
+		t.Errorf("couldn't decode JSON: %v", err)
+	}
+	return m
+}
+
+func checkMap(t *testing.T, subjectMap, checks map[string]string) {
+	t.Helper()
+	for key, checkValue := range checks {
+		if value, found := subjectMap[key]; found {
+			if value != checkValue {
+				t.Errorf("field \"%v\" value \"%v\" should be \"%v\"", key, value, checkValue)
+			}
+		} else {
+			t.Errorf("field \"%v\" not found", key)
+		}
 	}
 }
 
