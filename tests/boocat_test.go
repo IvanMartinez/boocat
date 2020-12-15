@@ -50,9 +50,10 @@ func initializedDB() (db *MockDB) {
 		"synopsys": "fable",
 	})
 	db.AddRecord(context.TODO(), "book", map[string]string{
-		"name":   "Nineteen Eighty-Four",
-		"year":   "1949",
-		"author": "author2",
+		"name":     "Nineteen Eighty-Four",
+		"year":     "1949",
+		"author":   "author2",
+		"synopsys": "dystopia",
 	})
 	return db
 }
@@ -98,14 +99,34 @@ func TestGetRecord(t *testing.T) {
 	if res.StatusCode != 200 {
 		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
-	resMap := decodeJSONBody(t, res.Body)
+	resMap := decodeToMap(t, res.Body)
 	checkMap(t, resMap, map[string]string{
 		"name":      "Haruki Murakami",
 		"birthdate": "1949",
 		"biography": "Japanese"})
 }
 
-func decodeJSONBody(t *testing.T, reader io.ReadCloser) (m map[string]string) {
+func TestGetRecords(t *testing.T) {
+	initialize()
+	req := httptest.NewRequest("GET", "/list/book", nil)
+	res := handle(req)
+	if res.StatusCode != 200 {
+		t.Errorf("expected status code 200 but got %v", res.StatusCode)
+	}
+	resMaps := decodeToMaps(t, res.Body)
+	findMapInSlice(t, resMaps, map[string]string{
+		"name":     "Norwegian Wood",
+		"year":     "1987",
+		"author":   "author1",
+		"synopsis": "novel"})
+	findMapInSlice(t, resMaps, map[string]string{
+		"name":     "Nineteen Eighty-Four",
+		"year":     "1949",
+		"author":   "author2",
+		"synopsys": "dystopia"})
+}
+
+func decodeToMap(t *testing.T, reader io.ReadCloser) (m map[string]string) {
 	t.Helper()
 	defer reader.Close()
 	// Decode the JSON
@@ -117,6 +138,49 @@ func decodeJSONBody(t *testing.T, reader io.ReadCloser) (m map[string]string) {
 	return m
 }
 
+func decodeToMaps(t *testing.T, reader io.ReadCloser) (s []map[string]string) {
+	t.Helper()
+	defer reader.Close()
+	// Decode the JSON
+	decoder := json.NewDecoder(reader)
+
+	if err := decoder.Decode(&s); err != nil {
+		t.Errorf("couldn't decode JSON: %v", err)
+	}
+	return s
+}
+
+// findMapInSlice checks that there is a map in subjectMaps that contains al the key-value pairs of checks
+func findMapInSlice(t *testing.T, subjectMaps []map[string]string, checks map[string]string) {
+	t.Helper()
+	// For every map
+	for _, subjectMap := range subjectMaps {
+		match := true
+		// For every check
+		for key, checkValue := range checks {
+			if value, found := subjectMap[key]; found {
+				if value != checkValue {
+					// subjectMap's value of key doesn't match checkValue
+					match = false
+					// We don't perform more checks on this map
+					break
+				}
+			} else {
+				// key doesn't exist in subjectMap
+				match = false
+				// We don't perform more checks on this map
+				break
+			}
+		}
+		if match {
+			// All the checks matched, we found a matching map
+			return
+		}
+	}
+	t.Errorf("couldn't find a map that matches %v", checks)
+}
+
+// checkMap checks that subjectMap contains all the key-value pairs of checks
 func checkMap(t *testing.T, subjectMap, checks map[string]string) {
 	t.Helper()
 	for key, checkValue := range checks {
