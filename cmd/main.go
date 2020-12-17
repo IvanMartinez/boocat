@@ -33,7 +33,8 @@ func main() {
 	// Start services
 	db := database.Connect(ctx, dbURI, []string{"author", "book"})
 	formats.Initialize(db)
-	server.StartServer(ctx, db, *url)
+	server.Initialize(ctx, db, *url)
+	server.Start()
 
 	// Wait for ctx to be cancelled
 	<-ctx.Done()

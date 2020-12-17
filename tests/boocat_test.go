@@ -114,6 +114,10 @@ func TestGetRecords(t *testing.T) {
 		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
 	resMaps := decodeToMaps(t, res.Body)
+	// There is one extra empty map because of the way the template is defined
+	if len(resMaps) != 5 {
+		t.Errorf("expected 5 maps but got %v", len(resMaps))
+	}
 	findMapInSlice(t, resMaps, map[string]string{
 		"name":     "Norwegian Wood",
 		"year":     "1987",
@@ -124,6 +128,66 @@ func TestGetRecords(t *testing.T) {
 		"year":     "1949",
 		"author":   "author2",
 		"synopsys": "dystopia"})
+}
+
+func TestAddRecord(t *testing.T) {
+	initialize()
+	req := httptest.NewRequest("POST", "/book", strings.NewReader("name=The Wind-Up Bird Chronicle&year=1995&"+
+		"author=author1&synopsis=novel"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := handle(req)
+	if res.StatusCode != 200 {
+		t.Errorf("expected status code 200 but got %v", res.StatusCode)
+	}
+	// Check the response to the request
+	resMap := decodeToMap(t, res.Body)
+	checkMap(t, resMap, map[string]string{
+		"name":     "The Wind-Up Bird Chronicle",
+		"year":     "1995",
+		"author":   "author1",
+		"synopsis": "novel"})
+	// Check getting the same record to make sure it's properly stored
+	req = httptest.NewRequest("GET", "/book?id="+resMap["id"], nil)
+	res = handle(req)
+	if res.StatusCode != 200 {
+		t.Errorf("expected status code 200 but got %v", res.StatusCode)
+	}
+	resMap = decodeToMap(t, res.Body)
+	checkMap(t, resMap, map[string]string{
+		"name":     "The Wind-Up Bird Chronicle",
+		"year":     "1995",
+		"author":   "author1",
+		"synopsis": "novel"})
+}
+
+func TestUpdateRecord(t *testing.T) {
+	initialize()
+	req := httptest.NewRequest("POST", "/author", strings.NewReader("id=author3&name=Miguel De Cervantes Saavedra&"+
+		"birthdate=1547"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := handle(req)
+	if res.StatusCode != 200 {
+		t.Errorf("expected status code 200 but got %v", res.StatusCode)
+	}
+	// Check the response to the request
+	resMap := decodeToMap(t, res.Body)
+	checkMap(t, resMap, map[string]string{
+		"id":        "author3",
+		"name":      "Miguel De Cervantes Saavedra",
+		"birthdate": "1547",
+		"biography": "Spanish"})
+	// Check getting the same record to make sure it's properly stored
+	req = httptest.NewRequest("GET", "/author?id="+resMap["id"], nil)
+	res = handle(req)
+	if res.StatusCode != 200 {
+		t.Errorf("expected status code 200 but got %v", res.StatusCode)
+	}
+	resMap = decodeToMap(t, res.Body)
+	checkMap(t, resMap, map[string]string{
+		"id":        "author3",
+		"name":      "Miguel De Cervantes Saavedra",
+		"birthdate": "1547",
+		"biography": "Spanish"})
 }
 
 func decodeToMap(t *testing.T, reader io.ReadCloser) (m map[string]string) {
@@ -203,5 +267,5 @@ func handle(req *http.Request) *http.Response {
 func initialize() {
 	db := initializedDB()
 	formats.Initialize(db)
-	server.StartServer(context.Background(), "", "web", db)
+	server.Initialize(context.Background(), "", "web", db)
 }

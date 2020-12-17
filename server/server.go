@@ -16,22 +16,23 @@ var (
 	server *http.Server
 )
 
-// StartServer starts the server in url with files in path and database db
-func StartServer(ctx context.Context, url, path string, database database.DB) {
+// Initialize initializes the server configuration without starting it. This is used in testing.
+func Initialize(ctx context.Context, url, path string, database database.DB) {
 	webfiles.Load(path)
 	db = database
-
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", Handle)
 	server = &http.Server{
 		Addr:    url,
 		Handler: mux,
 	}
+}
 
+// Start starts the initialized server
+func Start() {
 	// Start the HTTP server in a new goroutine
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-
 			log.Fatalf("couldn't start HTTP server: %v", err)
 		}
 	}()
