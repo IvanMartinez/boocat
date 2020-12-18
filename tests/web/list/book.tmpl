@@ -1,6 +1,11 @@
+[
+{{range .}}
 {
 {{range $key, $value := .}}
 "{{$key}}":"{{$value.Value}}",
 {{end}}
 "_f":""
-}
+},
+{{end}}
+{}
+]

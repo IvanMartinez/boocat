@@ -160,6 +160,23 @@ func TestAddRecord(t *testing.T) {
 		"synopsis": "novel"})
 }
 
+func TestAddRecordValidationFail(t *testing.T) {
+	initialize()
+	req := httptest.NewRequest("POST", "/book", strings.NewReader("name=the wind-up bird chronicle&year=95&"+
+		"author=author4&synopsis=novel"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := handle(req)
+	if res.StatusCode != 200 {
+		t.Errorf("expected status code 200 but got %v", res.StatusCode)
+	}
+	// Check the response to the request
+	resMap := decodeToMap(t, res.Body)
+	checkMap(t, resMap, map[string]string{
+		"name_failed":   "",
+		"year_failed":   "",
+		"author_failed": ""})
+}
+
 func TestUpdateRecord(t *testing.T) {
 	initialize()
 	req := httptest.NewRequest("POST", "/author", strings.NewReader("id=author3&name=Miguel De Cervantes Saavedra&"+

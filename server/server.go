@@ -11,6 +11,11 @@ import (
 	"github.com/ivanmartinez/boocat/webfiles"
 )
 
+type templateField struct {
+	Value            interface{}
+	FailedValidation bool
+}
+
 var (
 	db     database.DB
 	server *http.Server
@@ -101,23 +106,6 @@ func handleWithTemplate(w http.ResponseWriter, r *http.Request, template *webfil
 	}
 }
 
-// submittedFormValues returns a map with the values of the query parameters as well as the submitted form fields.
-// In case of conflict the form value prevails.
-func submittedFormValues(r *http.Request) map[string]string {
-	values := make(map[string]string)
-	// Read values from the query parameters
-	query := r.URL.Query()
-	for param := range query {
-		values[param] = query.Get(param)
-	}
-	// Read values from the posted form
-	r.ParseForm()
-	for field := range r.PostForm {
-		values[field] = r.PostForm.Get(field)
-	}
-	return values
-}
-
 func handleGet(ctx context.Context, formatName string, params map[string]string) interface{} {
 	if id, found := params["id"]; found {
 		return getRecord(ctx, formatName, id)
@@ -133,7 +121,7 @@ func handlePost(ctx context.Context, formatName string, params map[string]string
 }
 
 // newRecord adds a record of a format (author, book...)
-func newRecord(ctx context.Context, formatName string, record map[string]string) interface{} {
+func newRecord(ctx context.Context, formatName string, record map[string]string) map[string]templateField {
 	format, found := formats.Get(formatName)
 	if !found {
 		log.Printf("couldn't find format \"%v\"", formatName)
@@ -148,11 +136,11 @@ func newRecord(ctx context.Context, formatName string, record map[string]string)
 			record["id"] = id
 		}
 	}
-	return record
+	return recordToTemplateFields(record)
 }
 
 // updateRecord updates a record of a format (author, book...)
-func updateRecord(ctx context.Context, formatName string, record map[string]string) interface{} {
+func updateRecord(ctx context.Context, formatName string, record map[string]string) map[string]templateField {
 	format, found := formats.Get(formatName)
 	if !found {
 		log.Printf("couldn't find format \"%v\"", formatName)
@@ -172,11 +160,11 @@ func updateRecord(ctx context.Context, formatName string, record map[string]stri
 			log.Printf("error updating record in database: %v\n", err)
 		}
 	}
-	return record
+	return recordToTemplateFields(record)
 }
 
 // getRecord returns a record of a format (author, book...)
-func getRecord(ctx context.Context, formatName, id string) map[string]string {
+func getRecord(ctx context.Context, formatName, id string) map[string]templateField {
 	record, err := db.GetRecord(ctx, formatName, id)
 	if err != nil {
 		log.Printf("error getting database record: %v\n", err)
@@ -184,15 +172,51 @@ func getRecord(ctx context.Context, formatName, id string) map[string]string {
 		return nil
 	}
 
-	return record
+	return recordToTemplateFields(record)
 }
 
 // list returns a slice of all records of a format (authors, books...)
-func list(ctx context.Context, format string) []map[string]string {
+func list(ctx context.Context, format string) []map[string]templateField {
 	records, err := db.GetAllRecords(ctx, format)
 	if err != nil {
 		log.Printf("error getting records from database: %v\n", err)
 		return nil
 	}
-	return records
+	return recordsToTemplateFields(records)
+}
+
+// submittedFormValues returns a map with the values of the query parameters as well as the submitted form fields.
+// In case of conflict the form value prevails.
+func submittedFormValues(r *http.Request) map[string]string {
+	values := make(map[string]string)
+	// Read values from the query parameters
+	query := r.URL.Query()
+	for param := range query {
+		values[param] = query.Get(param)
+	}
+	// Read values from the posted form
+	r.ParseForm()
+	for field := range r.PostForm {
+		values[field] = r.PostForm.Get(field)
+	}
+	return values
+}
+
+func recordsToTemplateFields(records []map[string]string) (fields []map[string]templateField) {
+	fields = make([]map[string]templateField, 0, len(records))
+	for _, record := range records {
+		fields = append(fields, recordToTemplateFields(record))
+	}
+	return fields
+}
+
+func recordToTemplateFields(record map[string]string) (fields map[string]templateField) {
+	fields = make(map[string]templateField)
+	for name, value := range record {
+		fields[name] = templateField{
+			Value:            value,
+			FailedValidation: false,
+		}
+	}
+	return fields
 }
