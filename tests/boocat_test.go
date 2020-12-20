@@ -13,6 +13,11 @@ import (
 	"github.com/ivanmartinez/boocat/server"
 )
 
+type templateField struct {
+	Value            string `json:"value"`
+	FailedValidation bool   `json:"failed_validation"`
+}
+
 // initiaziledDB returns a MockDB with data for testing
 func initializedDB() (db *MockDB) {
 	db = NewDB()
@@ -99,8 +104,8 @@ func TestGetRecord(t *testing.T) {
 	if res.StatusCode != 200 {
 		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
-	resMap := decodeToMap(t, res.Body)
-	checkMap(t, resMap, map[string]string{
+	fields := decodeToFields(t, res.Body)
+	checkValues(t, fields, map[string]string{
 		"name":      "Haruki Murakami",
 		"birthdate": "1949",
 		"biography": "Japanese"})
@@ -140,20 +145,20 @@ func TestAddRecord(t *testing.T) {
 		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
 	// Check the response to the request
-	resMap := decodeToMap(t, res.Body)
-	checkMap(t, resMap, map[string]string{
+	fields := decodeToFields(t, res.Body)
+	checkValues(t, fields, map[string]string{
 		"name":     "The Wind-Up Bird Chronicle",
 		"year":     "1995",
 		"author":   "author1",
 		"synopsis": "novel"})
 	// Check getting the same record to make sure it's properly stored
-	req = httptest.NewRequest("GET", "/book?id="+resMap["id"], nil)
+	req = httptest.NewRequest("GET", "/book?id="+fields["id"].Value, nil)
 	res = handle(req)
 	if res.StatusCode != 200 {
 		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
-	resMap = decodeToMap(t, res.Body)
-	checkMap(t, resMap, map[string]string{
+	fields = decodeToFields(t, res.Body)
+	checkValues(t, fields, map[string]string{
 		"name":     "The Wind-Up Bird Chronicle",
 		"year":     "1995",
 		"author":   "author1",
@@ -170,11 +175,13 @@ func TestAddRecordValidationFail(t *testing.T) {
 		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
 	// Check the response to the request
-	resMap := decodeToMap(t, res.Body)
-	checkMap(t, resMap, map[string]string{
-		"name_failed":   "",
-		"year_failed":   "",
-		"author_failed": ""})
+	fields := decodeToFields(t, res.Body)
+	checkValidation(t, fields, map[string]bool{
+		"name":     true,
+		"year":     true,
+		"author":   true,
+		"synopsis": false})
+	// @TODO: Check that the record hasn't been added
 }
 
 func TestUpdateRecord(t *testing.T) {
@@ -187,27 +194,59 @@ func TestUpdateRecord(t *testing.T) {
 		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
 	// Check the response to the request
-	resMap := decodeToMap(t, res.Body)
-	checkMap(t, resMap, map[string]string{
+	fields := decodeToFields(t, res.Body)
+	checkValues(t, fields, map[string]string{
 		"id":        "author3",
 		"name":      "Miguel De Cervantes Saavedra",
 		"birthdate": "1547",
 		"biography": "Spanish"})
 	// Check getting the same record to make sure it's properly stored
-	req = httptest.NewRequest("GET", "/author?id="+resMap["id"], nil)
+	req = httptest.NewRequest("GET", "/author?id="+fields["id"].Value, nil)
 	res = handle(req)
 	if res.StatusCode != 200 {
 		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
-	resMap = decodeToMap(t, res.Body)
-	checkMap(t, resMap, map[string]string{
+	fields = decodeToFields(t, res.Body)
+	checkValues(t, fields, map[string]string{
 		"id":        "author3",
 		"name":      "Miguel De Cervantes Saavedra",
 		"birthdate": "1547",
 		"biography": "Spanish"})
 }
 
-func decodeToMap(t *testing.T, reader io.ReadCloser) (m map[string]string) {
+func TestUpdateRecordValidationFail(t *testing.T) {
+	initialize()
+	req := httptest.NewRequest("POST", "/author", strings.NewReader("id=author2&name=george orwell&"+
+		"birthdate=MCMIII"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := handle(req)
+	if res.StatusCode != 200 {
+		t.Errorf("expected status code 200 but got %v", res.StatusCode)
+	}
+	// Check the response to the request
+	fields := decodeToFields(t, res.Body)
+	checkValues(t, fields, map[string]string{
+		"id":        "author2",
+		"name":      "george orwell",
+		"birthdate": "MCMIII"})
+	checkValidation(t, fields, map[string]bool{
+		"name":      true,
+		"birthdate": true})
+	// Check getting the same record to make sure it hasn't changed
+	req = httptest.NewRequest("GET", "/author?id="+fields["id"].Value, nil)
+	res = handle(req)
+	if res.StatusCode != 200 {
+		t.Errorf("expected status code 200 but got %v", res.StatusCode)
+	}
+	fields = decodeToFields(t, res.Body)
+	checkValues(t, fields, map[string]string{
+		"id":        "author2",
+		"name":      "George Orwell",
+		"birthdate": "1903",
+		"biography": "English"})
+}
+
+func decodeToFields(t *testing.T, reader io.ReadCloser) (m map[string]templateField) {
 	t.Helper()
 	defer reader.Close()
 	// Decode the JSON
@@ -261,13 +300,29 @@ func findMapInSlice(t *testing.T, subjectMaps []map[string]string, checks map[st
 	t.Errorf("couldn't find a map that matches %v", checks)
 }
 
-// checkMap checks that subjectMap contains all the key-value pairs of checks
-func checkMap(t *testing.T, subjectMap, checks map[string]string) {
+// checkValues checks that the values of templateFields matches the checks
+func checkValues(t *testing.T, templateFields map[string]templateField, checks map[string]string) {
 	t.Helper()
 	for key, checkValue := range checks {
-		if value, found := subjectMap[key]; found {
-			if value != checkValue {
-				t.Errorf("field \"%v\" value \"%v\" should be \"%v\"", key, value, checkValue)
+		if field, found := templateFields[key]; found {
+			if field.Value != checkValue {
+				t.Errorf("field \"%v\" value \"%v\" should be \"%v\"", key, field.Value, checkValue)
+			}
+		} else {
+			t.Errorf("field \"%v\" not found", key)
+		}
+	}
+}
+
+// checkValidation checks that the validation of templateFields matches the checks
+func checkValidation(t *testing.T, templateFields map[string]templateField, checks map[string]bool) {
+	t.Helper()
+	for key, checkFailed := range checks {
+		if field, found := templateFields[key]; found {
+			if field.FailedValidation && !checkFailed {
+				t.Errorf("field \"%v\" shouldn't have failed validation", key)
+			} else if !field.FailedValidation && checkFailed {
+				t.Errorf("field \"%v\" should have failed validation", key)
 			}
 		} else {
 			t.Errorf("field \"%v\" not found", key)

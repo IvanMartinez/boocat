@@ -136,7 +136,7 @@ func newRecord(ctx context.Context, formatName string, record map[string]string)
 			record["id"] = id
 		}
 	}
-	return recordToTemplateFields(record)
+	return recordToValidatedTemplateFields(record, failed)
 }
 
 // updateRecord updates a record of a format (author, book...)
@@ -160,7 +160,7 @@ func updateRecord(ctx context.Context, formatName string, record map[string]stri
 			log.Printf("error updating record in database: %v\n", err)
 		}
 	}
-	return recordToTemplateFields(record)
+	return recordToValidatedTemplateFields(record, failed)
 }
 
 // getRecord returns a record of a format (author, book...)
@@ -216,6 +216,25 @@ func recordToTemplateFields(record map[string]string) (fields map[string]templat
 		fields[name] = templateField{
 			Value:            value,
 			FailedValidation: false,
+		}
+	}
+	return fields
+}
+
+func recordToValidatedTemplateFields(record map[string]string,
+	failed map[string]struct{}) (fields map[string]templateField) {
+	fields = make(map[string]templateField)
+	for name, value := range record {
+		if _, found := failed[name]; !found {
+			fields[name] = templateField{
+				Value:            value,
+				FailedValidation: false,
+			}
+		} else {
+			fields[name] = templateField{
+				Value:            value,
+				FailedValidation: true,
+			}
 		}
 	}
 	return fields
