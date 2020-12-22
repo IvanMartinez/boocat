@@ -4,10 +4,10 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"path/filepath"
 
 	"github.com/ivanmartinez/boocat/database"
 	"github.com/ivanmartinez/boocat/formats"
+	"github.com/ivanmartinez/boocat/validators"
 	"github.com/ivanmartinez/boocat/webfiles"
 )
 
@@ -50,17 +50,6 @@ func ShutdownServer(ctx context.Context) {
 	}
 }
 
-/*
-	Changing to paths as follows:
-	- Get form to search records:       GET /{format}
-	- Show search result:               POST /{format}?search_criteria
-	- Get form to create new record:    GET /edit/{format}
-	- Get form to edit existing record: GET /edit/{format}?id=...
-	- Create new record:                POST .../{format}?...	// DIFFERENCE WITH SEARCH? id EMPTY?
-	- Update existing record:           POST .../{format}?id=...
-	- Show record:                      GET /{format}?id=...
-*/
-
 // Handle handles a HTTP request.
 // The only reason this function is public is to make it testable.
 func Handle(w http.ResponseWriter, r *http.Request) {
@@ -82,23 +71,13 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleWithTemplate(w http.ResponseWriter, r *http.Request, template *webfiles.Template) {
-	path := r.URL.Path
-	ext := filepath.Ext(path)
-	base := filepath.Base(path)
-	name := base[:len(base)-len(ext)]
-
-	if _, found := formats.Get(name); !found {
-		log.Printf("template file \"%v\" must have the name of a format", path)
-		http.Error(w, "", http.StatusInternalServerError)
-		return
-	}
 	formValues := submittedFormValues(r)
 	var data interface{}
 	if r.Method == "GET" {
-		data = handleGet(r.Context(), name, formValues)
+		data = handleGet(r.Context(), template.FormatName, formValues)
 	} else {
 		// POST
-		data = handlePost(r.Context(), name, formValues)
+		data = handlePost(r.Context(), template.FormatName, template.Format, formValues)
 	}
 	err := template.Write(w, data)
 	if err != nil {
@@ -113,55 +92,12 @@ func handleGet(ctx context.Context, formatName string, params map[string]string)
 	return list(ctx, formatName)
 }
 
-func handlePost(ctx context.Context, formatName string, params map[string]string) interface{} {
+func handlePost(ctx context.Context, formatName string, format map[string]validators.Validator,
+	params map[string]string) interface{} {
 	if _, found := params["id"]; found {
-		return updateRecord(ctx, formatName, params)
+		return updateRecord(ctx, formatName, format, params)
 	}
-	return newRecord(ctx, formatName, params)
-}
-
-// newRecord adds a record of a format (author, book...)
-func newRecord(ctx context.Context, formatName string, record map[string]string) map[string]templateField {
-	format, found := formats.Get(formatName)
-	if !found {
-		log.Printf("couldn't find format \"%v\"", formatName)
-		return nil
-	}
-	failed := formats.Validate(ctx, format, record)
-	if len(failed) == 0 {
-		id, err := db.AddRecord(ctx, formatName, record)
-		if err != nil {
-			log.Printf("error adding record to database: %v\n", err)
-		} else {
-			record["id"] = id
-		}
-	}
-	return recordToValidatedTemplateFields(record, failed)
-}
-
-// updateRecord updates a record of a format (author, book...)
-func updateRecord(ctx context.Context, formatName string, record map[string]string) map[string]templateField {
-	format, found := formats.Get(formatName)
-	if !found {
-		log.Printf("couldn't find format \"%v\"", formatName)
-		return nil
-	}
-	failed := formats.Validate(ctx, format, record)
-	if len(failed) == 0 {
-		// If record doesn't have all the fields defined in the format, get the missing fields from the database
-		// @TODO: Maybe put this in a separate function
-		if formats.IncompleteRecord(format, record) {
-			if dbRecord, err := db.GetRecord(ctx, formatName, record["id"]); err == nil {
-				record = formats.Merge(format, record, dbRecord)
-			} else {
-				log.Printf("error getting database record: %v\n", err)
-			}
-		}
-		if err := db.UpdateRecord(ctx, formatName, record); err != nil {
-			log.Printf("error updating record in database: %v\n", err)
-		}
-	}
-	return recordToValidatedTemplateFields(record, failed)
+	return newRecord(ctx, formatName, format, params)
 }
 
 // getRecord returns a record of a format (author, book...)
@@ -184,6 +120,42 @@ func list(ctx context.Context, format string) []map[string]templateField {
 		return nil
 	}
 	return recordsToTemplateFields(records)
+}
+
+// newRecord adds a record of a format (author, book...)
+func newRecord(ctx context.Context, formatName string, format map[string]validators.Validator,
+	record map[string]string) map[string]templateField {
+	failed := formats.Validate(ctx, format, record)
+	if len(failed) == 0 {
+		id, err := db.AddRecord(ctx, formatName, record)
+		if err != nil {
+			log.Printf("error adding record to database: %v\n", err)
+		} else {
+			record["id"] = id
+		}
+	}
+	return recordToValidatedTemplateFields(record, failed)
+}
+
+// updateRecord updates a record of a format (author, book...)
+func updateRecord(ctx context.Context, formatName string, format map[string]validators.Validator,
+	record map[string]string) map[string]templateField {
+	failed := formats.Validate(ctx, format, record)
+	if len(failed) == 0 {
+		// If record doesn't have all the fields defined in the format, get the missing fields from the database
+		// @TODO: Maybe put this in a separate function
+		if formats.IncompleteRecord(format, record) {
+			if dbRecord, err := db.GetRecord(ctx, formatName, record["id"]); err == nil {
+				record = formats.Merge(format, record, dbRecord)
+			} else {
+				log.Printf("error getting database record: %v\n", err)
+			}
+		}
+		if err := db.UpdateRecord(ctx, formatName, record); err != nil {
+			log.Printf("error updating record in database: %v\n", err)
+		}
+	}
+	return recordToValidatedTemplateFields(record, failed)
 }
 
 // submittedFormValues returns a map with the values of the query parameters as well as the submitted form fields.

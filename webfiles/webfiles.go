@@ -1,17 +1,23 @@
 package webfiles
 
 import (
+	"fmt"
 	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"path/filepath"
 	"strings"
+
+	"github.com/ivanmartinez/boocat/formats"
+	"github.com/ivanmartinez/boocat/validators"
 )
 
 // Template contains a template.Template to generate output
 type Template struct {
-	template *template.Template
+	template   *template.Template
+	FormatName string
+	Format     map[string]validators.Validator
 }
 
 // StaticFile contains the contents of a static file
@@ -78,14 +84,7 @@ func loadFile(rootPath, path string) {
 
 	switch {
 	case ext == "tmpl":
-		tmpl, err := template.ParseFiles(rootPath + path)
-		if err != nil {
-			log.Fatal(err)
-		}
-		templates[strings.TrimSuffix(path, filepath.Ext(path))] =
-			&Template{
-				template: tmpl,
-			}
+		loadTemplate(rootPath, path)
 	case (ext == "htm") || (ext == "html"):
 		content, err := ioutil.ReadFile(rootPath + path)
 		if err != nil {
@@ -105,4 +104,22 @@ func loadFile(rootPath, path string) {
 				content: content,
 			}
 	}
+}
+
+func loadTemplate(rootPath, path string) {
+	templateName := strings.TrimSuffix(path, filepath.Ext(path))
+	formatName, format := formats.FormatForTemplate(templateName)
+	if format == nil {
+		log.Fatal(fmt.Sprintf("Template %v must end with the name of a format", path))
+	}
+	tmpl, err := template.ParseFiles(rootPath + path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	templates[strings.TrimSuffix(path, filepath.Ext(path))] =
+		&Template{
+			template:   tmpl,
+			FormatName: formatName,
+			Format:     format,
+		}
 }

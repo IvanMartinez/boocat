@@ -4,6 +4,7 @@ package formats
 
 import (
 	"context"
+	"strings"
 
 	"github.com/ivanmartinez/boocat/database"
 	"github.com/ivanmartinez/boocat/validators"
@@ -88,4 +89,14 @@ func Validate(ctx context.Context, validators map[string]validators.Validator,
 		}
 	}
 	return failed
+}
+
+// FormatForTemplate returns the format whose name matches the ending of the template name, nil if it doesn't exist
+func FormatForTemplate(templateName string) (formatName string, format map[string]validators.Validator) {
+	for formatName, format := range formats {
+		if strings.HasSuffix(templateName, formatName) {
+			return formatName, format
+		}
+	}
+	return "", nil
 }
