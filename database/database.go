@@ -126,12 +126,16 @@ func (db *mongoDB) GetRecord(ctx context.Context, format, id string) (map[string
 	return nil, errors.New("format not found")
 }
 
-func splitID(record map[string]string) (string, map[string]string) {
-	if id, found := record["id"]; found {
-		delete(record, "id")
-		return id, record
+func splitID(record map[string]string) (id string, recordNoID map[string]string) {
+	recordNoID = make(map[string]string)
+	for name, value := range record {
+		if name == "id" {
+			id = value
+		} else {
+			recordNoID[name] = value
+		}
 	}
-	return "", record
+	return id, recordNoID
 }
 
 // Return map[string]string slice from MongoDB document slice. It just renames "_id" keys to "id".
