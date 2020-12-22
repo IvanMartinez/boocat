@@ -1,6 +1,6 @@
 <html></html>
 {{range .}}
-<div><A href="/view/book?id={{.id}}">{{.name}}</A></div>
+<div><A href="/view/book?id={{.id.Value}}">{{.name.Value}}</A></div>
 {{end}}
 <br>
 <div><A href="/new/book">New</A></div>

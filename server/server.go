@@ -149,6 +149,7 @@ func updateRecord(ctx context.Context, formatName string, record map[string]stri
 	failed := formats.Validate(ctx, format, record)
 	if len(failed) == 0 {
 		// If record doesn't have all the fields defined in the format, get the missing fields from the database
+		// @TODO: Maybe put this in a separate function
 		if formats.IncompleteRecord(format, record) {
 			if dbRecord, err := db.GetRecord(ctx, formatName, record["id"]); err == nil {
 				record = formats.Merge(format, record, dbRecord)

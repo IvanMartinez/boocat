@@ -1,10 +1,32 @@
-
+<html>
 <h1>Editing author</h1>
 
-<form action="/view/author" method="POST">
-<input type="hidden" id="id" name="id" value="{{.id}}">
-<div>Name: <input type="text" id="name" name="name" value="{{.name}}"/>
-<div>Year of birth: <input type="text" id="birthdate" name="birthdate" value="{{.birthdate}}"/>
-<div>Biography: <input type="text" id="biography" name="biography" value="{{.biography}}"/>
-<div><input type="submit" value="Save"/></div>
+{{if .id}}
+<form action="/edit/author?id={{.id.Value}}" method="POST">
+<input type="hidden" id="id" name="id" value="{{.id.Value}}">
+{{else}}
+<form action="/edit/author" method="POST">
+{{end}}
+<div>
+Name: <input type="text" id="name" name="name" value="{{.name.Value}}"/>
+</div>
+{{if .name.FailedValidation}}
+<div style="color:red">Fail</div>
+{{end}}
+<div>
+Year of birth: <input type="text" id="birthdate" name="birthdate" value="{{.birthdate.Value}}"/>
+</div>
+{{if .birthdate.FailedValidation}}
+<div style="color:red">Fail</div>
+{{end}}
+<div>
+Biography: <input type="text" id="biography" name="biography" value="{{.biography.Value}}"/>
+</div>
+{{if .biography.FailedValidation}}
+<div style="color:red">Fail</div>
+{{end}}
+<div>
+<input type="submit" value="Save"/>
+</div>
 </form>
+</html>
