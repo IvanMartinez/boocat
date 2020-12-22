@@ -2,10 +2,9 @@ package tests
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
-
-	"github.com/ivanmartinez/boocat/database"
 )
 
 // MockDB is a database mock for testing
@@ -20,7 +19,7 @@ type RecordSet struct {
 	// Last number used in the generation of record IDs
 	lastIDNumber int
 	// Map of records
-	records map[string]database.Record
+	records map[string]map[string]string
 }
 
 // NewDB returns a new MockDB with sets for author and book records
@@ -30,84 +29,67 @@ func NewDB() (db *MockDB) {
 			"author": &RecordSet{
 				name:         "author",
 				lastIDNumber: 0,
-				records:      make(map[string]database.Record, 0),
+				records:      make(map[string]map[string]string, 0),
 			},
 			"book": &RecordSet{
 				name:         "book",
 				lastIDNumber: 0,
-				records:      make(map[string]database.Record, 0),
+				records:      make(map[string]map[string]string, 0),
 			},
 		},
 	}
 }
 
-// AddRecord adds a new record (author, book...) with the given field values to
-// the database
-func (db *MockDB) AddRecord(ctx context.Context, format string,
-	values map[string]string) (string, error) {
-
-	rSet, found := db.recordSets[format]
-	if !found {
-		return "", fmt.Errorf("unknown format %v", format)
+// AddRecord adds a new record (author, book...)
+func (db *MockDB) AddRecord(ctx context.Context, format string, record map[string]string) (string, error) {
+	if rSet, found := db.recordSets[format]; found {
+		if _, found := record["id"]; found {
+			return "", errors.New("new record cannot have id")
+		}
+		id := rSet.nextID()
+		record["id"] = id
+		rSet.records[id] = record
+		return id, nil
 	}
-
-	ID := rSet.nextID()
-	rSet.records[ID] = database.Record{
-		DbID:        ID,
-		FieldValues: values,
-	}
-
-	return ID, nil
+	return "", errors.New("format not found")
 }
 
-// Update updates a database record (author, book...) with the given
-// field values
-func (db *MockDB) UpdateRecord(ctx context.Context, format string,
-	record database.Record) error {
-
-	rSet, found := db.recordSets[format]
-	if !found {
-		return fmt.Errorf("unknown format %v", format)
+// Update updates a record (author, book...)
+func (db *MockDB) UpdateRecord(ctx context.Context, format string, record map[string]string) error {
+	if rSet, found := db.recordSets[format]; found {
+		if id, found := record["id"]; found {
+			rSet.records[id] = record
+			return nil
+		}
+		return errors.New("record doesn't have id")
 	}
-
-	rSet.records[record.DbID] = record
-
-	return nil
+	return errors.New("format not found")
 }
 
 // GetAll returns all records of a specific format from the database
-func (db *MockDB) GetAllRecords(ctx context.Context,
-	format string) ([]database.Record, error) {
-
-	rSet, found := db.recordSets[format]
-	if !found {
-		return nil, fmt.Errorf("unknown format %v", format)
+func (db *MockDB) GetAllRecords(ctx context.Context, format string) ([]map[string]string, error) {
+	if rSet, found := db.recordSets[format]; found {
+		// Convert from map of records to slice of records
+		slice := make([]map[string]string, len(rSet.records), len(rSet.records))
+		i := 0
+		for _, record := range rSet.records {
+			slice[i] = record
+			i++
+		}
+		return slice, nil
 	}
-
-	slice := make([]database.Record, len(rSet.records), len(rSet.records))
-	i := 0
-	for _, record := range rSet.records {
-		slice[i] = record
-		i++
-	}
-
-	return slice, nil
+	return nil, errors.New("format not found")
 }
 
 // Get returns a record from the database
-func (db *MockDB) GetRecord(ctx context.Context, format,
-	id string) (*database.Record, error) {
-
-	rSet, found := db.recordSets[format]
-	if !found {
-		return nil, fmt.Errorf("unknown format %v", format)
+func (db *MockDB) GetRecord(ctx context.Context, format, id string) (map[string]string, error) {
+	if rSet, found := db.recordSets[format]; found {
+		if record, found := rSet.records[id]; found {
+			return record, nil
+		}
+		return nil, fmt.Errorf("unknown record %v", id)
 	}
-
-	if record, found := rSet.records[id]; found {
-		return &record, nil
-	}
-
-	return nil, fmt.Errorf("unknown record %v", id)
+	return nil, errors.New("format not found")
 }
 
 // LastID takes a format and returns the database ID of the last record of

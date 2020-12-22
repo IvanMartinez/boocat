@@ -1,0 +1,32 @@
+<html>
+<h1>Editing book</h1>
+
+{{if .id}}
+<form action="/edit/book?id={{.id.Value}}" method="POST">
+<input type="hidden" id="id" name="id" value="{{.id.Value}}">
+{{else}}
+<form action="/edit/book" method="POST">
+{{end}}
+<div>
+Name: <input type="text" id="name" name="name" value="{{.name.Value}}"/>
+</div>
+{{if .name.FailedValidation}}
+<div style="color:red">Fail</div>
+{{end}}
+<div>
+Year: <input type="text" id="year" name="year" value="{{.year.Value}}"/>
+</div>
+{{if .year.FailedValidation}}
+<div style="color:red">Fail</div>
+{{end}}
+<div>
+Synopsis: <input type="text" id="synopsis" name="synopsis" value="{{.synopsis.Value}}"/>
+</div>
+{{if .synopsis.FailedValidation}}
+<div style="color:red">Fail</div>
+{{end}}
+<div>
+<input type="submit" value="Save"/>
+</div>
+</form>
+</html>

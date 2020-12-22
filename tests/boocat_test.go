@@ -2,14 +2,21 @@ package tests
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"html/template"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
-	"github.com/ivanmartinez/boocat"
 	"github.com/ivanmartinez/boocat/formats"
+	"github.com/ivanmartinez/boocat/server"
 )
+
+type templateField struct {
+	Value            string `json:"value"`
+	FailedValidation bool   `json:"failed_validation"`
+}
 
 // initiaziledDB returns a MockDB with data for testing
 func initializedDB() (db *MockDB) {
@@ -48,437 +55,289 @@ func initializedDB() (db *MockDB) {
 		"synopsys": "fable",
 	})
 	db.AddRecord(context.TODO(), "book", map[string]string{
-		"name":   "Nineteen Eighty-Four",
-		"year":   "1949",
-		"author": "author2",
+		"name":     "Nineteen Eighty-Four",
+		"year":     "1949",
+		"author":   "author2",
+		"synopsys": "dystopia",
 	})
 	return db
 }
 
-// TestEditNew tests boocat.EditNew
-func TestEditNew(t *testing.T) {
-	// Initialize formats and database
-	db := initializedDB()
-	formats.Initialize(db)
-
-	// Run EditNew for author format
-	tplName, tplData := boocat.EditNew(context.TODO(), db, "author", "",
-		nil)
-	form := tplData.(boocat.TemplateForm)
-
-	// Check the template
-	if tplName != "/edit" {
-		t.Errorf("expected template \"/edit\" but got \"%v\"", tplName)
-	}
-	// Check the form
-	if err := checkForm(form, "Author", "/author/save", 3); err != nil {
-		t.Error(err)
-	}
-	// Check birthdate field
-	if err := checkField(form.Fields, "birthdate",
-		"Year of birth", "A year", "", false); err != nil {
-
-		t.Error(err)
+func TestWrongMethod(t *testing.T) {
+	req := httptest.NewRequest("PUT", "/", nil)
+	res := handle(req)
+	if res.StatusCode != 400 {
+		t.Errorf("expected status code 400 but got %v", res.StatusCode)
 	}
 }
 
-// TestSaveNew tests boocat.SaveNew when validation succeeds
-func TestSaveNew(t *testing.T) {
-	// Initialize formats and database
-	db := initializedDB()
-	formats.Initialize(db)
-
-	// Run SaveNew with a new book
-	tplName, tplData := boocat.SaveNew(context.TODO(), db, "book", "",
-		map[string]string{
-			"name":     "The Wind-Up Bird Chronicle",
-			"year":     "1995",
-			"author":   "author1",
-			"synopsis": "novel",
-		})
-	record := tplData.(boocat.TemplateRecord)
-
-	// Check the template
-	if tplName != "/view" {
-		t.Errorf("expected template \"/view\" but got \"%v\"", tplName)
-	}
-	// Check the record
-	if err := checkTemplateRecord(record,
-		"/book/"+db.LastID("book"),
-		map[string]string{
-			"Name":     "The Wind-Up Bird Chronicle",
-			"Year":     "1995",
-			"Synopsis": "novel",
-			"Author":   "author1",
-		}); err != nil {
-
-		t.Error(err)
+func TestNoFile(t *testing.T) {
+	req := httptest.NewRequest("GET", "/", nil)
+	res := handle(req)
+	if res.StatusCode != 404 {
+		t.Errorf("expected status code 404 but got %v", res.StatusCode)
 	}
 }
 
-func TestSaveNewValidationFail(t *testing.T) {
-	// Initialize formats and database
-	db := initializedDB()
-	formats.Initialize(db)
-
-	// Run SaveNew with a new author
-	tplName, tplData := boocat.SaveNew(context.TODO(), db, "author", "",
-		map[string]string{
-			"name":      "miguel de cervantes saavedra",
-			"birthdate": "",
-		})
-	form := tplData.(boocat.TemplateForm)
-
-	// Check the template
-	if tplName != "/edit" {
-		t.Errorf("expected template \"/edit\" but got \"%v\"", tplName)
+func TestStaticFile(t *testing.T) {
+	initialize()
+	req := httptest.NewRequest("GET", "/hello", nil)
+	res := handle(req)
+	if res.StatusCode != 200 {
+		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
-	// Check the form
-	if err := checkForm(form, "Author", "/author/save", 3); err != nil {
+	buf := new(strings.Builder)
+	if _, err := io.Copy(buf, res.Body); err != nil {
 		t.Error(err)
-	}
-	// Check name field
-	if err := checkField(form.Fields, "name",
-		"Name", "A-Z,a-z", "miguel de cervantes saavedra", true); err != nil {
-
-		t.Error(err)
-	}
-	// Check birthdate field
-	if err := checkField(form.Fields, "birthdate",
-		"Year of birth", "A year", "", true); err != nil {
-
-		t.Error(err)
+	} else if strings.TrimSpace(buf.String()) != "hello" {
+		t.Errorf("expected reading file with body \"hello\" but got \"%v\"", strings.TrimSpace(buf.String()))
 	}
 }
 
-// TestEditExisting tests boocat.EditExisting when validation succeeds
-func TestEditExisting(t *testing.T) {
-	// Initialize formats and database
-	db := initializedDB()
-	formats.Initialize(db)
+//@TODO: Check that a tamplate has the name of a format. I'm going to leave this for later because I will
+// refactor this part.
 
-	// Run EditExisting with the last book in the database
-	tplName, tplData := boocat.EditExisting(context.TODO(), db, "book",
-		"book4", nil)
-	form := tplData.(boocat.TemplateForm)
-
-	// Check the template
-	if tplName != "/edit" {
-		t.Errorf("expected template \"/edit\" but got \"%v\"", tplName)
+func TestGetRecord(t *testing.T) {
+	initialize()
+	req := httptest.NewRequest("GET", "/author?id=author1", nil)
+	res := handle(req)
+	if res.StatusCode != 200 {
+		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
-	// Check the form
-	if err := checkForm(form, "Book", "/book/"+db.LastID("book")+"/save",
-		4); err != nil {
-
-		t.Error(err)
-	}
-	// Check name field
-	if err := checkField(form.Fields, "name", "Name", "A-Z,a-z",
-		"Nineteen Eighty-Four", false); err != nil {
-
-		t.Error(err)
-	}
+	fields := decodeToFields(t, res.Body)
+	checkValues(t, fields, map[string]string{
+		"name":      "Haruki Murakami",
+		"birthdate": "1949",
+		"biography": "Japanese"})
 }
 
-// TestEditExistingValidationFail tests boocat.EditExisting when validation
-// fails. This could happen because format validation could change after the record
-// was created.
-func TestEditExistingValidationFail(t *testing.T) {
-	// Initialize formats and database
-	db := initializedDB()
-	formats.Initialize(db)
-
-	// Run EditExisting with the last book in the database
-	tplName, tplData := boocat.EditExisting(context.TODO(), db, "author",
-		db.LastID("author"), nil)
-	form := tplData.(boocat.TemplateForm)
-
-	// Check the template
-	if tplName != "/edit" {
-		t.Errorf("expected template \"/edit\" but got \"%v\"", tplName)
+func TestGetRecords(t *testing.T) {
+	initialize()
+	req := httptest.NewRequest("GET", "/list/book", nil)
+	res := handle(req)
+	if res.StatusCode != 200 {
+		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
-	// Check the form
-	if err := checkForm(form, "Author", "/author/"+db.LastID("author")+"/save",
-		3); err != nil {
-
-		t.Error(err)
+	resMaps := decodeToMaps(t, res.Body)
+	// There is one extra empty map because of the way the template is defined
+	if len(resMaps) != 5 {
+		t.Errorf("expected 5 maps but got %v", len(resMaps))
 	}
-	// Check name field
-	if err := checkField(form.Fields, "name", "Name", "A-Z,a-z",
-		"miguel de cervantes saavedra", true); err != nil {
-
-		t.Error(err)
-	}
-	// Check birthdate field
-	if err := checkField(form.Fields, "birthdate", "Year of birth", "A year",
-		"MDXLVII", true); err != nil {
-
-		t.Error(err)
-	}
+	findMapInSlice(t, resMaps, map[string]string{
+		"name":     "Norwegian Wood",
+		"year":     "1987",
+		"author":   "author1",
+		"synopsis": "novel"})
+	findMapInSlice(t, resMaps, map[string]string{
+		"name":     "Nineteen Eighty-Four",
+		"year":     "1949",
+		"author":   "author2",
+		"synopsys": "dystopia"})
 }
 
-// TestSaveExisting tests boocat.SaveExisting
-func TestSaveExisting(t *testing.T) {
-	// Initialize formats and database
-	db := initializedDB()
-	formats.Initialize(db)
-
-	// Run SaveExisting with a new author
-	tplName, tplData := boocat.SaveExisting(context.TODO(), db, "author",
-		db.LastID("author"),
-		map[string]string{
-			"name":      "Simone De Beauvoir",
-			"birthdate": "1908",
-		})
-	record := tplData.(boocat.TemplateRecord)
-
-	// Check the template
-	if tplName != "/view" {
-		t.Errorf("expected template \"/view\" but got \"%v\"", tplName)
+func TestAddRecord(t *testing.T) {
+	initialize()
+	req := httptest.NewRequest("POST", "/book", strings.NewReader("name=The Wind-Up Bird Chronicle&year=1995&"+
+		"author=author1&synopsis=novel"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := handle(req)
+	if res.StatusCode != 200 {
+		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
-	// Find the record with the expected URL
-	if err := checkTemplateRecord(record,
-		"/author/"+db.LastID("author"),
-		map[string]string{
-			"Name":          "Simone De Beauvoir",
-			"Year of birth": "1908",
-			"Biography":     "",
-		}); err != nil {
-
-		t.Error(err)
+	// Check the response to the request
+	fields := decodeToFields(t, res.Body)
+	checkValues(t, fields, map[string]string{
+		"name":     "The Wind-Up Bird Chronicle",
+		"year":     "1995",
+		"author":   "author1",
+		"synopsis": "novel"})
+	// Check getting the same record to make sure it's properly stored
+	req = httptest.NewRequest("GET", "/book?id="+fields["id"].Value, nil)
+	res = handle(req)
+	if res.StatusCode != 200 {
+		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
+	fields = decodeToFields(t, res.Body)
+	checkValues(t, fields, map[string]string{
+		"name":     "The Wind-Up Bird Chronicle",
+		"year":     "1995",
+		"author":   "author1",
+		"synopsis": "novel"})
 }
 
-// TestSaveExistingValidationFail tests boocat.SaveExisting when validation
-// fails
-func TestSaveExistingValidationFail(t *testing.T) {
-	// Initialize formats and database
-	db := initializedDB()
-	formats.Initialize(db)
-
-	// Run SaveExisting with a new author
-	tplName, tplData := boocat.SaveExisting(context.TODO(), db, "book",
-		"book1",
-		map[string]string{
-			"name":   "the road to wigan pier",
-			"year":   "MCMXXXVII",
-			"author": "noauthor",
-		})
-	form := tplData.(boocat.TemplateForm)
-
-	// Check the template
-	if tplName != "/edit" {
-		t.Errorf("expected template \"/edit\" but got \"%v\"", tplName)
+func TestAddRecordValidationFail(t *testing.T) {
+	initialize()
+	req := httptest.NewRequest("POST", "/book", strings.NewReader("name=the wind-up bird chronicle&year=95&"+
+		"author=author4&synopsis=novel"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := handle(req)
+	if res.StatusCode != 200 {
+		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
-	// Check the form
-	if err := checkForm(form, "Book", "/book/book1/save", 4); err != nil {
-		t.Error(err)
-	}
-	// Check name field
-	if err := checkField(form.Fields, "name",
-		"Name", "A-Z,a-z", "the road to wigan pier", true); err != nil {
-
-		t.Error(err)
-	}
-	// Check birthdate field
-	if err := checkField(form.Fields, "year",
-		"Year", "A year", "MCMXXXVII", true); err != nil {
-
-		t.Error(err)
-	}
-	// Check author field
-	if err := checkField(form.Fields, "author",
-		"Author", "Writer", "noauthor", true); err != nil {
-
-		t.Error(err)
-	}
+	// Check the response to the request
+	fields := decodeToFields(t, res.Body)
+	checkValidation(t, fields, map[string]bool{
+		"name":     true,
+		"year":     true,
+		"author":   true,
+		"synopsis": false})
+	// @TODO: Check that the record hasn't been added
 }
 
-// TestView tests boocat.View
-func TestView(t *testing.T) {
-	// Initialize formats and database
-	db := initializedDB()
-	formats.Initialize(db)
-
-	// Run View with the last author in the database
-	tplName, tplData := boocat.View(context.TODO(), db, "author",
-		"author2", nil)
-
-	record := tplData.(boocat.TemplateRecord)
-
-	// Check the template
-	if tplName != "/view" {
-		t.Errorf("expected template \"/view\" but got \"%v\"", tplName)
+func TestUpdateRecord(t *testing.T) {
+	initialize()
+	req := httptest.NewRequest("POST", "/author", strings.NewReader("id=author3&name=Miguel De Cervantes Saavedra&"+
+		"birthdate=1547"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := handle(req)
+	if res.StatusCode != 200 {
+		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
-
-	// Check the record
-	if err := checkTemplateRecord(record, "/author/author2",
-		map[string]string{
-			"Name":          "George Orwell",
-			"Year of birth": "1903",
-			"Biography":     "English",
-		}); err != nil {
-
-		t.Error(err)
+	// Check the response to the request
+	fields := decodeToFields(t, res.Body)
+	checkValues(t, fields, map[string]string{
+		"id":        "author3",
+		"name":      "Miguel De Cervantes Saavedra",
+		"birthdate": "1547",
+		"biography": "Spanish"})
+	// Check getting the same record to make sure it's properly stored
+	req = httptest.NewRequest("GET", "/author?id="+fields["id"].Value, nil)
+	res = handle(req)
+	if res.StatusCode != 200 {
+		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
+	fields = decodeToFields(t, res.Body)
+	checkValues(t, fields, map[string]string{
+		"id":        "author3",
+		"name":      "Miguel De Cervantes Saavedra",
+		"birthdate": "1547",
+		"biography": "Spanish"})
 }
 
-// TestList tests boocat.List
-func TestList(t *testing.T) {
-	// Initialize formats and database
-	db := initializedDB()
-	formats.Initialize(db)
-
-	// Run List for book format
-	tplName, tplData := boocat.List(context.TODO(), db, "book", "",
-		nil)
-	records := tplData.([]boocat.TemplateRecord)
-
-	// Check the template
-	if tplName != "/list" {
-		t.Errorf("expected template \"/list\" but got \"%v\"", tplName)
+func TestUpdateRecordValidationFail(t *testing.T) {
+	initialize()
+	req := httptest.NewRequest("POST", "/author", strings.NewReader("id=author2&name=george orwell&"+
+		"birthdate=MCMIII"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := handle(req)
+	if res.StatusCode != 200 {
+		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
-	// Check the number of records in the returned list data
-	if len(records) != 4 {
-		t.Errorf("expected 4 records but got %v", len(records))
+	// Check the response to the request
+	fields := decodeToFields(t, res.Body)
+	checkValues(t, fields, map[string]string{
+		"id":        "author2",
+		"name":      "george orwell",
+		"birthdate": "MCMIII"})
+	checkValidation(t, fields, map[string]bool{
+		"name":      true,
+		"birthdate": true})
+	// Check getting the same record to make sure it hasn't changed
+	req = httptest.NewRequest("GET", "/author?id="+fields["id"].Value, nil)
+	res = handle(req)
+	if res.StatusCode != 200 {
+		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
-	// Find one record with the expected URL
-	if err := findCheckTemplateRecord(records, "/book/book1",
-		map[string]string{
-			"name":     "Norwegian Wood",
-			"year":     "1987",
-			"synopsis": "novel",
-			"author":   "author1",
-		}); err != nil {
-
-		t.Error(err)
-	}
-
-	// Find another record with the expected URL
-	if err := findCheckTemplateRecord(records, "/book/book2",
-		map[string]string{
-			"name":     "Kafka On The Shore",
-			"year":     "2002",
-			"synopsis": "novel",
-			"author":   "author1",
-		}); err != nil {
-
-		t.Error(err)
-	}
+	fields = decodeToFields(t, res.Body)
+	checkValues(t, fields, map[string]string{
+		"id":        "author2",
+		"name":      "George Orwell",
+		"birthdate": "1903",
+		"biography": "English"})
 }
 
-// checkForm checks the values and number of fields of a TemplateForm
-func checkForm(form boocat.TemplateForm, name, url string,
-	fields int) error {
+func decodeToFields(t *testing.T, reader io.ReadCloser) (m map[string]templateField) {
+	t.Helper()
+	defer reader.Close()
+	// Decode the JSON
+	decoder := json.NewDecoder(reader)
 
-	if form.Name != name {
-		return fmt.Errorf("unexpected form label \"%v\" should be \"%v\"",
-			form.Name, name)
+	if err := decoder.Decode(&m); err != nil {
+		t.Errorf("couldn't decode JSON: %v", err)
 	}
-	if form.SubmitURL != template.URL(url) {
-		return fmt.Errorf("unexpected form submit URL \"%v\" should be \"%v\"",
-			form.SubmitURL, url)
-	}
-	if len(form.Fields) != fields {
-		return fmt.Errorf("unexpected number of fields %v should be %v",
-			len(form.Fields), fields)
-	}
-
-	return nil
+	return m
 }
 
-// checkField checks the values of a Field
-func checkField(fields []formats.Field, name,
-	label, description, value string, valFail bool) error {
+func decodeToMaps(t *testing.T, reader io.ReadCloser) (s []map[string]string) {
+	t.Helper()
+	defer reader.Close()
+	// Decode the JSON
+	decoder := json.NewDecoder(reader)
 
-	for _, field := range fields {
-		if field.Name == name {
-			if field.Label != label {
-				return fmt.Errorf(
-					"unexpected field label \"%v\" should be \"%v\"",
-					field.Label, label)
+	if err := decoder.Decode(&s); err != nil {
+		t.Errorf("couldn't decode JSON: %v", err)
+	}
+	return s
+}
+
+// findMapInSlice checks that there is a map in subjectMaps that contains al the key-value pairs of checks
+func findMapInSlice(t *testing.T, subjectMaps []map[string]string, checks map[string]string) {
+	t.Helper()
+	// For every map
+	for _, subjectMap := range subjectMaps {
+		match := true
+		// For every check
+		for key, checkValue := range checks {
+			if value, found := subjectMap[key]; found {
+				if value != checkValue {
+					// subjectMap's value of key doesn't match checkValue
+					match = false
+					// We don't perform more checks on this map
+					break
+				}
+			} else {
+				// key doesn't exist in subjectMap
+				match = false
+				// We don't perform more checks on this map
+				break
 			}
-			if field.Description != description {
-				return fmt.Errorf(
-					"unexpected field description \"%v\" should be \"%v\"",
-					field.Description, description)
-			}
-			if field.Value != value {
-				return fmt.Errorf(
-					"unexpected field value \"%v\" should be \"%v\"",
-					field.Value, value)
-			}
-			if field.ValidationFailed && !valFail {
-				return errors.New(
-					"value should not have failed validation")
-			}
-			if !field.ValidationFailed && valFail {
-				return errors.New(
-					"value should have failed validation")
-			}
-
-			return nil
+		}
+		if match {
+			// All the checks matched, we found a matching map
+			return
 		}
 	}
-
-	return fmt.Errorf("couldn't find field \"%v\"", name)
+	t.Errorf("couldn't find a map that matches %v", checks)
 }
 
-// findCheckTemplateRecord looks for a record with the given URL in a slice,
-// and then checks the values of its fields
-func findCheckTemplateRecord(records []boocat.TemplateRecord, URL string,
-	expectedValues map[string]string) error {
-
-	if record := findTemplateRecord(records, URL); record != nil {
-		return checkFieldValues(record.FieldValues, expectedValues)
-	}
-
-	return fmt.Errorf("couldn't find record with URL \"%v\"", URL)
-}
-
-// findTemplateRecord looks for a record with the given URL in a slice
-func findTemplateRecord(records []boocat.TemplateRecord,
-	URL string) *boocat.TemplateRecord {
-
-	for _, record := range records {
-		if record.URL == URL {
-			return &record
-		}
-	}
-
-	return nil
-}
-
-// checkTemplateRecord checks the URL and fields of a TemplateRecord
-func checkTemplateRecord(record boocat.TemplateRecord, url string,
-	expectedValues map[string]string) error {
-
-	if record.URL != url {
-		return fmt.Errorf("unexpected URL \"%v\" should be \"%v\"",
-			record.URL, url)
-	}
-
-	return checkFieldValues(record.FieldValues, expectedValues)
-}
-
-// checkFieldValues compares two maps of field-value pairs
-func checkFieldValues(values, expectedValues map[string]string) error {
-	if len(values) != len(expectedValues) {
-		return fmt.Errorf("unexpected number of %v fields should be %v",
-			len(values), len(expectedValues))
-	}
-
-	for name, value := range values {
-		if expectedValue, found := expectedValues[name]; found {
-			if value != expectedValue {
-				return fmt.Errorf(
-					"unexpected field \"%v\" value \"%v\" should be \"%v\"",
-					name, value, expectedValue)
+// checkValues checks that the values of templateFields matches the checks
+func checkValues(t *testing.T, templateFields map[string]templateField, checks map[string]string) {
+	t.Helper()
+	for key, checkValue := range checks {
+		if field, found := templateFields[key]; found {
+			if field.Value != checkValue {
+				t.Errorf("field \"%v\" value \"%v\" should be \"%v\"", key, field.Value, checkValue)
 			}
 		} else {
-			return fmt.Errorf("unexpected field \"%v\"", name)
+			t.Errorf("field \"%v\" not found", key)
 		}
 	}
+}
 
-	return nil
+// checkValidation checks that the validation of templateFields matches the checks
+func checkValidation(t *testing.T, templateFields map[string]templateField, checks map[string]bool) {
+	t.Helper()
+	for key, checkFailed := range checks {
+		if field, found := templateFields[key]; found {
+			if field.FailedValidation && !checkFailed {
+				t.Errorf("field \"%v\" shouldn't have failed validation", key)
+			} else if !field.FailedValidation && checkFailed {
+				t.Errorf("field \"%v\" should have failed validation", key)
+			}
+		} else {
+			t.Errorf("field \"%v\" not found", key)
+		}
+	}
+}
+
+func handle(req *http.Request) *http.Response {
+	w := httptest.NewRecorder()
+	server.Handle(w, req)
+	return w.Result()
+}
+
+func initialize() {
+	db := initializedDB()
+	formats.Initialize(db)
+	server.Initialize(context.Background(), "", "web", db)
 }
