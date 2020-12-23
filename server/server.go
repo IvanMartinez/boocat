@@ -2,11 +2,11 @@ package server
 
 import (
 	"context"
-	"log"
 	"net/http"
 
 	"github.com/ivanmartinez/boocat/database"
 	"github.com/ivanmartinez/boocat/formats"
+	"github.com/ivanmartinez/boocat/log"
 	"github.com/ivanmartinez/boocat/validators"
 	"github.com/ivanmartinez/boocat/webfiles"
 )
@@ -38,7 +38,7 @@ func Start() {
 	// Start the HTTP server in a new goroutine
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("couldn't start HTTP server: %v", err)
+			log.Error.Fatalf("couldn't start HTTP server: %v", err)
 		}
 	}()
 }
@@ -46,7 +46,7 @@ func Start() {
 func ShutdownServer(ctx context.Context) {
 	// Shut the HTTP server down
 	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("server shutdown failed: %v", err)
+		log.Error.Fatalf("server shutdown failed: %v", err)
 	}
 }
 
@@ -104,7 +104,7 @@ func handlePost(ctx context.Context, formatName string, format map[string]valida
 func getRecord(ctx context.Context, formatName, id string) map[string]templateField {
 	record, err := db.GetRecord(ctx, formatName, id)
 	if err != nil {
-		log.Printf("error getting database record: %v\n", err)
+		log.Error.Printf("getting record from database: %v\n", err)
 		//_, tplData := EditNew(ctx, format, id, nil)
 		return nil
 	}
@@ -116,7 +116,7 @@ func getRecord(ctx context.Context, formatName, id string) map[string]templateFi
 func list(ctx context.Context, format string) []map[string]templateField {
 	records, err := db.GetAllRecords(ctx, format)
 	if err != nil {
-		log.Printf("error getting records from database: %v\n", err)
+		log.Error.Printf("getting records from database: %v\n", err)
 		return nil
 	}
 	return recordsToTemplateFields(records)
@@ -129,7 +129,7 @@ func newRecord(ctx context.Context, formatName string, format map[string]validat
 	if len(failed) == 0 {
 		id, err := db.AddRecord(ctx, formatName, record)
 		if err != nil {
-			log.Printf("error adding record to database: %v\n", err)
+			log.Error.Printf("adding record to database: %v\n", err)
 		} else {
 			record["id"] = id
 		}
@@ -148,11 +148,11 @@ func updateRecord(ctx context.Context, formatName string, format map[string]vali
 			if dbRecord, err := db.GetRecord(ctx, formatName, record["id"]); err == nil {
 				record = formats.Merge(format, record, dbRecord)
 			} else {
-				log.Printf("error getting database record: %v\n", err)
+				log.Error.Printf("getting record from database: %v\n", err)
 			}
 		}
 		if err := db.UpdateRecord(ctx, formatName, record); err != nil {
-			log.Printf("error updating record in database: %v\n", err)
+			log.Error.Printf("updating record in database: %v\n", err)
 		}
 	}
 	return recordToValidatedTemplateFields(record, failed)

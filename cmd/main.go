@@ -3,13 +3,13 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
 	"os"
 	"os/signal"
 	"time"
 
 	"github.com/ivanmartinez/boocat/database"
 	"github.com/ivanmartinez/boocat/formats"
+	"github.com/ivanmartinez/boocat/log"
 	"github.com/ivanmartinez/boocat/server"
 )
 
@@ -26,7 +26,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		oscall := <-c
-		log.Printf("received signal %v", oscall)
+		log.Info.Printf("received signal %v", oscall)
 		cancel()
 	}()
 

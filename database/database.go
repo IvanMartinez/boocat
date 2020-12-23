@@ -3,12 +3,13 @@ package database
 import (
 	"context"
 	"errors"
-	"log"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"github.com/ivanmartinez/boocat/log"
 )
 
 const (
@@ -39,11 +40,11 @@ func Connect(ctx context.Context, dbURI *string, formats []string) *mongoDB {
 	// Create and connect the client
 	cli, err := mongo.NewClient(options.Client().ApplyURI(*dbURI))
 	if err != nil {
-		log.Fatal(err)
+		log.Error.Fatal(err)
 	}
 	err = cli.Connect(ctx)
 	if err != nil {
-		log.Fatal(err)
+		log.Error.Fatal(err)
 	}
 
 	// Initialize the collections
