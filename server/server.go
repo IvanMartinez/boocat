@@ -124,7 +124,7 @@ func list(ctx context.Context, format string) []map[string]templateField {
 
 // newRecord adds a record of a format (author, book...)
 func newRecord(ctx context.Context, formatName string, format map[string]validators.Validator,
-	record map[string]string) map[string]templateField {
+	record map[string]string) map[string]interface{} {
 	failed := formats.Validate(ctx, format, record)
 	if len(failed) == 0 {
 		id, err := db.AddRecord(ctx, formatName, record)
@@ -139,7 +139,7 @@ func newRecord(ctx context.Context, formatName string, format map[string]validat
 
 // updateRecord updates a record of a format (author, book...)
 func updateRecord(ctx context.Context, formatName string, format map[string]validators.Validator,
-	record map[string]string) map[string]templateField {
+	record map[string]string) map[string]interface{} {
 	failed := formats.Validate(ctx, format, record)
 	if len(failed) == 0 {
 		// If record doesn't have all the fields defined in the format, get the missing fields from the database
@@ -195,8 +195,8 @@ func recordToTemplateFields(record map[string]string) (fields map[string]templat
 }
 
 func recordToValidatedTemplateFields(record map[string]string,
-	failed map[string]struct{}) (fields map[string]templateField) {
-	fields = make(map[string]templateField)
+	failed map[string]struct{}) (fields map[string]interface{}) {
+	fields = make(map[string]interface{})
 	for name, value := range record {
 		if _, found := failed[name]; !found {
 			fields[name] = templateField{
