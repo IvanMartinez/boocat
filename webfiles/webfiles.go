@@ -44,7 +44,7 @@ func (sFile *StaticFile) Write(w http.ResponseWriter) error {
 	return err
 }
 
-// Load loads all webfiles from the files in path and all the subirectories recursively
+// Load loads all webfiles from the files in path and all the subdirectories recursively
 func Load(path string) {
 	templates = make(map[string]*Template)
 	staticFiles = make(map[string]*StaticFile)

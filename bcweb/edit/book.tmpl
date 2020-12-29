@@ -1,4 +1,8 @@
 <html>
+{{if and ._success .id}}
+<meta http-equiv="refresh" content="0; URL=/book?id={{.id.Value}}" />
+{{- else}}
+
 <h1>Editing book</h1>
 
 {{if .id}}
@@ -29,4 +33,5 @@ Synopsis: <input type="text" id="synopsis" name="synopsis" value="{{.synopsis.Va
 <input type="submit" value="Save"/>
 </div>
 </form>
+{{- end}}
 </html>

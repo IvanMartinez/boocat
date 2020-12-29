@@ -94,9 +94,6 @@ func TestStaticFile(t *testing.T) {
 	}
 }
 
-//@TODO: Check that a tamplate has the name of a format. I'm going to leave this for later because I will
-// refactor this part.
-
 func TestGetRecord(t *testing.T) {
 	initialize()
 	req := httptest.NewRequest("GET", "/author?id=author1", nil)

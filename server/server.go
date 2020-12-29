@@ -125,21 +125,28 @@ func list(ctx context.Context, format string) []map[string]templateField {
 // newRecord adds a record of a format (author, book...)
 func newRecord(ctx context.Context, formatName string, format map[string]validators.Validator,
 	record map[string]string) map[string]interface{} {
+	success := false
 	failed := formats.Validate(ctx, format, record)
 	if len(failed) == 0 {
 		id, err := db.AddRecord(ctx, formatName, record)
 		if err != nil {
 			log.Error.Printf("adding record to database: %v\n", err)
 		} else {
+			success = true
 			record["id"] = id
 		}
 	}
-	return recordToValidatedTemplateFields(record, failed)
+	result := recordToValidatedTemplateFields(record, failed)
+	if success {
+		result["_success"] = struct{}{}
+	}
+	return result
 }
 
 // updateRecord updates a record of a format (author, book...)
 func updateRecord(ctx context.Context, formatName string, format map[string]validators.Validator,
 	record map[string]string) map[string]interface{} {
+	success := false
 	failed := formats.Validate(ctx, format, record)
 	if len(failed) == 0 {
 		// If record doesn't have all the fields defined in the format, get the missing fields from the database
@@ -153,9 +160,15 @@ func updateRecord(ctx context.Context, formatName string, format map[string]vali
 		}
 		if err := db.UpdateRecord(ctx, formatName, record); err != nil {
 			log.Error.Printf("updating record in database: %v\n", err)
+		} else {
+			success = true
 		}
 	}
-	return recordToValidatedTemplateFields(record, failed)
+	result := recordToValidatedTemplateFields(record, failed)
+	if success {
+		result["_success"] = struct{}{}
+	}
+	return result
 }
 
 // submittedFormValues returns a map with the values of the query parameters as well as the submitted form fields.
