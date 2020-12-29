@@ -1,8 +1,6 @@
 {
 {{range $key, $value := .}}
-{{if ne $key "_success"}}
-"{{$key}}":{"value":"{{$value.Value}}","failed_validation":{{$value.FailedValidation}}},
+"{{$key}}":"{{$value}}",
 {{end}}
-{{end}}
-"_f":{}
+"_f":""
 }

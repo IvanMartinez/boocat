@@ -33,7 +33,7 @@ func main() {
 	// Start services
 	db := database.Connect(ctx, dbURI, []string{"author", "book"})
 	formats.Initialize(db)
-	server.Initialize(ctx, *url, "bcweb", db)
+	server.Initialize(*url, "bcweb", db)
 	server.Start()
 
 	// Wait for ctx to be cancelled
