@@ -1,32 +1,32 @@
 <html>
 {{if and ._success .id}}
-<meta http-equiv="refresh" content="0; URL=/book?id={{.id.Value}}" />
+<meta http-equiv="refresh" content="0; URL=/book?id={{.id}}" />
 {{- else}}
 
 <h1>Editing book</h1>
 
 {{if .id}}
-<form action="/edit/book?id={{.id.Value}}" method="POST">
-<input type="hidden" id="id" name="id" value="{{.id.Value}}">
+<form action="/edit/book?id={{.id}}" method="POST">
+<input type="hidden" id="id" name="id" value="{{.id}}">
 {{else}}
 <form action="/edit/book" method="POST">
 {{end}}
 <div>
-Name: <input type="text" id="name" name="name" value="{{.name.Value}}"/>
+Name: <input type="text" id="name" name="name" value="{{.name}}"/>
 </div>
-{{if .name.FailedValidation}}
+{{if ._name_fail}}
 <div style="color:red">Fail</div>
 {{end}}
 <div>
-Year: <input type="text" id="year" name="year" value="{{.year.Value}}"/>
+Year: <input type="text" id="year" name="year" value="{{.year}}"/>
 </div>
-{{if .year.FailedValidation}}
+{{if ._year_fail}}
 <div style="color:red">Fail</div>
 {{end}}
 <div>
-Synopsis: <input type="text" id="synopsis" name="synopsis" value="{{.synopsis.Value}}"/>
+Synopsis: <input type="text" id="synopsis" name="synopsis" value="{{.synopsis}}"/>
 </div>
-{{if .synopsis.FailedValidation}}
+{{if ._synopsis_fail}}
 <div style="color:red">Fail</div>
 {{end}}
 <div>

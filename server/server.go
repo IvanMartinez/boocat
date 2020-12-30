@@ -100,10 +100,8 @@ func getRecord(ctx context.Context, formatName, id string) map[string]string {
 	record, err := db.GetRecord(ctx, formatName, id)
 	if err != nil {
 		log.Error.Printf("getting record from database: %v\n", err)
-		//_, tplData := EditNew(ctx, format, id, nil)
 		return nil
 	}
-
 	return record
 }
 
@@ -121,26 +119,30 @@ func list(ctx context.Context, format string) []map[string]string {
 func newRecord(ctx context.Context, formatName string, format map[string]validators.Validator,
 	record map[string]string) map[string]string {
 
+	tplData := make(map[string]string)
 	failed := formats.Validate(ctx, format, record)
-	tplData := add(record, failed)
+	tplData = add(tplData, failed)
 	if len(failed) == 0 {
 		id, err := db.AddRecord(ctx, formatName, record)
 		if err != nil {
 			log.Error.Printf("adding record to database: %v\n", err)
 		} else {
 			tplData["id"] = id
-			tplData["_success"] = ""
+			// Underscore value because empty string is empty pipeline in the template
+			tplData["_success"] = "_"
 		}
 	}
+	tplData = add(tplData, record)
 	return tplData
 }
 
 // updateRecord updates a record of a format (author, book...)
 func updateRecord(ctx context.Context, formatName string, format map[string]validators.Validator,
 	record map[string]string) map[string]string {
-
+	// @TODO: This is messy, refactor
+	tplData := make(map[string]string)
 	failed := formats.Validate(ctx, format, record)
-	tplData := add(record, failed)
+	tplData = add(tplData, failed)
 	if len(failed) == 0 {
 		// If record doesn't have all the fields defined in the format, get the missing fields from the database
 		// @TODO: Maybe put this in a separate function
@@ -154,9 +156,11 @@ func updateRecord(ctx context.Context, formatName string, format map[string]vali
 		if err := db.UpdateRecord(ctx, formatName, record); err != nil {
 			log.Error.Printf("updating record in database: %v\n", err)
 		} else {
-			tplData["_success"] = ""
+			// Underscore value because empty string is empty pipeline in the template
+			tplData["_success"] = "_"
 		}
 	}
+	tplData = add(tplData, record)
 	return tplData
 }
 

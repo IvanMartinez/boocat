@@ -81,10 +81,12 @@ func Validate(ctx context.Context, validators map[string]validators.Validator,
 		if name != "id" {
 			if validator, found := validators[name]; found {
 				if !validator.Validate(ctx, value) {
-					failed["_"+name+"_fail"] = ""
+					// Underscore value because empty string is empty pipeline in the template
+					failed["_"+name+"_fail"] = "_"
 				}
 			} else {
-				failed["_"+name+"_fail"] = ""
+				// Underscore value because empty string is empty pipeline in the template
+				failed["_"+name+"_fail"] = "_"
 			}
 		}
 	}

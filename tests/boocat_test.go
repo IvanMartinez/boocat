@@ -13,7 +13,7 @@ import (
 	"github.com/ivanmartinez/boocat/server"
 )
 
-// initiaziledDB returns a MockDB with data for testing
+// initializedDB returns a MockDB with data for testing
 func initializedDB() (db *MockDB) {
 	db = NewDB()
 	db.AddRecord(context.TODO(), "author", map[string]string{
@@ -98,9 +98,11 @@ func TestGetRecord(t *testing.T) {
 	}
 	fields := decodeToMap(t, res.Body)
 	checkValues(t, fields, map[string]string{
+		"id":        "author1",
 		"name":      "Haruki Murakami",
 		"birthdate": "1949",
-		"biography": "Japanese"})
+		"biography": "Japanese",
+		"_f":        ""})
 }
 
 func TestGetRecords(t *testing.T) {
@@ -139,16 +141,13 @@ func TestAddRecord(t *testing.T) {
 	// Check the response to the request
 	fields := decodeToMap(t, res.Body)
 	checkValues(t, fields, map[string]string{
+		"id":       "book5",
 		"name":     "The Wind-Up Bird Chronicle",
 		"year":     "1995",
 		"author":   "author1",
 		"synopsis": "novel",
-		"_success": ""})
-	checkNotExpected(t, fields, []string{
-		"_name_fail",
-		"_year_fail",
-		"_author_fail",
-		"_synopsis_fail"})
+		"_success": "_",
+		"_f":       ""})
 	// Check getting the same record to make sure it's properly stored
 	req = httptest.NewRequest("GET", "/book?id="+fields["id"], nil)
 	res = handle(req)
@@ -157,10 +156,12 @@ func TestAddRecord(t *testing.T) {
 	}
 	fields = decodeToMap(t, res.Body)
 	checkValues(t, fields, map[string]string{
+		"id":       "book5",
 		"name":     "The Wind-Up Bird Chronicle",
 		"year":     "1995",
 		"author":   "author1",
-		"synopsis": "novel"})
+		"synopsis": "novel",
+		"_f":       ""})
 }
 
 func TestAddRecordValidationFail(t *testing.T) {
@@ -175,12 +176,14 @@ func TestAddRecordValidationFail(t *testing.T) {
 	// Check the response to the request
 	fields := decodeToMap(t, res.Body)
 	checkValues(t, fields, map[string]string{
-		"_name_fail":   "",
-		"_year_fail":   "",
-		"_author_fail": ""})
-	checkNotExpected(t, fields, []string{
-		"_synopsis_fail",
-		"_success"})
+		"name":         "the wind-up bird chronicle",
+		"year":         "95",
+		"author":       "author4",
+		"synopsis":     "novel",
+		"_name_fail":   "_",
+		"_year_fail":   "_",
+		"_author_fail": "_",
+		"_f":           ""})
 	// @TODO: Check that the record hasn't been added
 }
 
@@ -199,7 +202,9 @@ func TestUpdateRecord(t *testing.T) {
 		"id":        "author3",
 		"name":      "Miguel De Cervantes Saavedra",
 		"birthdate": "1547",
-		"biography": "Spanish"})
+		"biography": "Spanish",
+		"_success":  "_",
+		"_f":        ""})
 	// Check getting the same record to make sure it's properly stored
 	req = httptest.NewRequest("GET", "/author?id="+fields["id"], nil)
 	res = handle(req)
@@ -207,11 +212,13 @@ func TestUpdateRecord(t *testing.T) {
 		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
 	fields = decodeToMap(t, res.Body)
+	// Check the response to the request
 	checkValues(t, fields, map[string]string{
 		"id":        "author3",
 		"name":      "Miguel De Cervantes Saavedra",
 		"birthdate": "1547",
-		"biography": "Spanish"})
+		"biography": "Spanish",
+		"_f":        ""})
 }
 
 func TestUpdateRecordValidationFail(t *testing.T) {
@@ -226,14 +233,12 @@ func TestUpdateRecordValidationFail(t *testing.T) {
 	// Check the response to the request
 	fields := decodeToMap(t, res.Body)
 	checkValues(t, fields, map[string]string{
-		"id":        "author2",
-		"name":      "george orwell",
-		"birthdate": "MCMIII"})
-	/*
-	checkValidation(t, fields, map[string]bool{
-		"name":      true,
-		"birthdate": true})
-	 */
+		"id":              "author2",
+		"name":            "george orwell",
+		"birthdate":       "MCMIII",
+		"_name_fail":      "_",
+		"_birthdate_fail": "_",
+		"_f":              ""})
 	// Check getting the same record to make sure it hasn't changed
 	req = httptest.NewRequest("GET", "/author?id="+fields["id"], nil)
 	res = handle(req)
@@ -245,7 +250,8 @@ func TestUpdateRecordValidationFail(t *testing.T) {
 		"id":        "author2",
 		"name":      "George Orwell",
 		"birthdate": "1903",
-		"biography": "English"})
+		"biography": "English",
+		"_f":         ""})
 }
 
 func decodeToMap(t *testing.T, reader io.ReadCloser) (m map[string]string) {
@@ -314,13 +320,8 @@ func checkValues(t *testing.T, templateData map[string]string, checks map[string
 			t.Errorf("field \"%v\" not found", key)
 		}
 	}
-}
-
-// checkNotExpected checks that templateData doesn't contain the fields
-func checkNotExpected(t *testing.T, templateData map[string]string, fields []string) {
-	t.Helper()
-	for _, key := range fields {
-		if _, found := templateData[key]; found {
+	for key, _ := range templateData {
+		if _, found := checks[key]; !found {
 			t.Errorf("field \"%v\" not expected", key)
 		}
 	}
