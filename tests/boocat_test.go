@@ -101,8 +101,7 @@ func TestGetRecord(t *testing.T) {
 		"id":        "author1",
 		"name":      "Haruki Murakami",
 		"birthdate": "1949",
-		"biography": "Japanese",
-		"_f":        ""})
+		"biography": "Japanese"})
 }
 
 func TestGetRecords(t *testing.T) {
@@ -113,9 +112,8 @@ func TestGetRecords(t *testing.T) {
 		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
 	resMaps := decodeToMaps(t, res.Body)
-	// There is one extra empty map because of the way the template is defined
-	if len(resMaps) != 5 {
-		t.Errorf("expected 5 maps but got %v", len(resMaps))
+	if len(resMaps) != 4 {
+		t.Errorf("expected 4 maps but got %v", len(resMaps))
 	}
 	findMapInSlice(t, resMaps, map[string]string{
 		"name":     "Norwegian Wood",
@@ -146,8 +144,7 @@ func TestAddRecord(t *testing.T) {
 		"year":     "1995",
 		"author":   "author1",
 		"synopsis": "novel",
-		"_success": "_",
-		"_f":       ""})
+		"_success": "_"})
 	// Check getting the same record to make sure it's properly stored
 	req = httptest.NewRequest("GET", "/book?id="+fields["id"], nil)
 	res = handle(req)
@@ -160,8 +157,7 @@ func TestAddRecord(t *testing.T) {
 		"name":     "The Wind-Up Bird Chronicle",
 		"year":     "1995",
 		"author":   "author1",
-		"synopsis": "novel",
-		"_f":       ""})
+		"synopsis": "novel"})
 }
 
 func TestAddRecordValidationFail(t *testing.T) {
@@ -182,8 +178,7 @@ func TestAddRecordValidationFail(t *testing.T) {
 		"synopsis":     "novel",
 		"_name_fail":   "_",
 		"_year_fail":   "_",
-		"_author_fail": "_",
-		"_f":           ""})
+		"_author_fail": "_"})
 	// @TODO: Check that the record hasn't been added
 }
 
@@ -203,8 +198,7 @@ func TestUpdateRecord(t *testing.T) {
 		"name":      "Miguel De Cervantes Saavedra",
 		"birthdate": "1547",
 		"biography": "Spanish",
-		"_success":  "_",
-		"_f":        ""})
+		"_success":  "_"})
 	// Check getting the same record to make sure it's properly stored
 	req = httptest.NewRequest("GET", "/author?id="+fields["id"], nil)
 	res = handle(req)
@@ -217,8 +211,7 @@ func TestUpdateRecord(t *testing.T) {
 		"id":        "author3",
 		"name":      "Miguel De Cervantes Saavedra",
 		"birthdate": "1547",
-		"biography": "Spanish",
-		"_f":        ""})
+		"biography": "Spanish"})
 }
 
 func TestUpdateRecordValidationFail(t *testing.T) {
@@ -237,8 +230,7 @@ func TestUpdateRecordValidationFail(t *testing.T) {
 		"name":            "george orwell",
 		"birthdate":       "MCMIII",
 		"_name_fail":      "_",
-		"_birthdate_fail": "_",
-		"_f":              ""})
+		"_birthdate_fail": "_"})
 	// Check getting the same record to make sure it hasn't changed
 	req = httptest.NewRequest("GET", "/author?id="+fields["id"], nil)
 	res = handle(req)
@@ -250,8 +242,7 @@ func TestUpdateRecordValidationFail(t *testing.T) {
 		"id":        "author2",
 		"name":      "George Orwell",
 		"birthdate": "1903",
-		"biography": "English",
-		"_f":         ""})
+		"biography": "English"})
 }
 
 func decodeToMap(t *testing.T, reader io.ReadCloser) (m map[string]string) {

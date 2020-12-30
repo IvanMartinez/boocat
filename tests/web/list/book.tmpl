@@ -1,11 +1,11 @@
+{{$firstElement := true}}
 [
-{{range .}}
-{
-{{range $key, $value := .}}
-"{{$key}}":"{{$value}}",
-{{end}}
-"_f":""
-},
-{{end}}
-{}
+{{- range .}}
+{{$firstPair := true}}
+{{- if $firstElement}}{{$firstElement = false}}{{else}},{{end}}{
+{{- range $key, $value := .}}
+{{if $firstPair}}{{$firstPair = false}}{{else}},{{end}}"{{$key}}":"{{$value}}"
+{{- end}}
+}
+{{- end}}
 ]

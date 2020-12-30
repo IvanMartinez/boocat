@@ -1,6 +1,6 @@
+{{$first := true}}
 {
-{{range $key, $value := .}}
-"{{$key}}":"{{$value}}",
-{{end}}
-"_f":""
+{{- range $key, $value := .}}
+{{if $first}}{{$first = false}}{{else}},{{end}}"{{$key}}":"{{$value}}"
+{{- end}}
 }
