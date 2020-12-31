@@ -69,7 +69,7 @@ func handleWithTemplate(w http.ResponseWriter, r *http.Request, template *webfil
 	formValues := submittedFormValues(r)
 	var data interface{}
 	if r.Method == "GET" {
-		data = handleGet(r.Context(), template.FormatName, formValues)
+		data = handleGet(r.Context(), template.FormatName, template.Format, formValues)
 	} else {
 		// POST
 		data = handlePost(r.Context(), template.FormatName, template.Format, formValues)
@@ -80,15 +80,18 @@ func handleWithTemplate(w http.ResponseWriter, r *http.Request, template *webfil
 	}
 }
 
-func handleGet(ctx context.Context, formatName string, params map[string]string) interface{} {
-	if id, found := params["id"]; found {
-		return getRecord(ctx, formatName, id)
+func handleGet(ctx context.Context, formatName string, format map[string]validators.Validator,
+	params map[string]string) interface{} {
+
+	if _, found := params["id"]; found {
+		return getRecord(ctx, formatName, format, params)
 	}
 	return list(ctx, formatName)
 }
 
 func handlePost(ctx context.Context, formatName string, format map[string]validators.Validator,
 	params map[string]string) interface{} {
+
 	if _, found := params["id"]; found {
 		return updateRecord(ctx, formatName, format, params)
 	}
@@ -96,12 +99,11 @@ func handlePost(ctx context.Context, formatName string, format map[string]valida
 }
 
 // getRecord returns a record of a format (author, book...)
-func getRecord(ctx context.Context, formatName, id string) map[string]string {
-	record, err := db.GetRecord(ctx, formatName, id)
-	if err != nil {
-		log.Error.Printf("getting record from database: %v\n", err)
-		return nil
-	}
+func getRecord(ctx context.Context, formatName string, format map[string]validators.Validator,
+	record map[string]string) map[string]string {
+	// If record contains all the fields (from previous template), don't query the database
+	// @TODO: This will produce very long URLs, better use a database memory cache
+	record = fillFromDatabase(ctx, record, formatName, format)
 	return record
 }
 
@@ -139,20 +141,13 @@ func newRecord(ctx context.Context, formatName string, format map[string]validat
 // updateRecord updates a record of a format (author, book...)
 func updateRecord(ctx context.Context, formatName string, format map[string]validators.Validator,
 	record map[string]string) map[string]string {
+
 	// @TODO: This is messy, refactor
 	tplData := make(map[string]string)
 	failed := formats.Validate(ctx, format, record)
 	tplData = add(tplData, failed)
 	if len(failed) == 0 {
-		// If record doesn't have all the fields defined in the format, get the missing fields from the database
-		// @TODO: Maybe put this in a separate function
-		if formats.IncompleteRecord(format, record) {
-			if dbRecord, err := db.GetRecord(ctx, formatName, record["id"]); err == nil {
-				record = formats.Merge(format, record, dbRecord)
-			} else {
-				log.Error.Printf("getting record from database: %v\n", err)
-			}
-		}
+		record = fillFromDatabase(ctx, record, formatName, format)
 		if err := db.UpdateRecord(ctx, formatName, record); err != nil {
 			log.Error.Printf("updating record in database: %v\n", err)
 		} else {
@@ -179,6 +174,21 @@ func submittedFormValues(r *http.Request) map[string]string {
 		values[field] = r.PostForm.Get(field)
 	}
 	return values
+}
+
+// fillFromDatabase If record is missing any field of the format, then get it from the database and return the filled
+// record
+func fillFromDatabase(ctx context.Context, record map[string]string, formatName string,
+	format map[string]validators.Validator) map[string]string {
+
+	if formats.IncompleteRecord(format, record) {
+		if dbRecord, err := db.GetRecord(ctx, formatName, record["id"]); err == nil {
+			record = formats.Merge(format, record, dbRecord)
+		} else {
+			log.Error.Printf("getting record from database: %v\n", err)
+		}
+	}
+	return record
 }
 
 // add adds the elements of sMap to pMap and returns the result. Keys that exist in both maps are left as they are in
