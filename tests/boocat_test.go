@@ -13,12 +13,7 @@ import (
 	"github.com/ivanmartinez/boocat/server"
 )
 
-type templateField struct {
-	Value            string `json:"value"`
-	FailedValidation bool   `json:"failed_validation"`
-}
-
-// initiaziledDB returns a MockDB with data for testing
+// initializedDB returns a MockDB with data for testing
 func initializedDB() (db *MockDB) {
 	db = NewDB()
 	db.AddRecord(context.TODO(), "author", map[string]string{
@@ -101,8 +96,9 @@ func TestGetRecord(t *testing.T) {
 	if res.StatusCode != 200 {
 		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
-	fields := decodeToFields(t, res.Body)
+	fields := decodeToMap(t, res.Body)
 	checkValues(t, fields, map[string]string{
+		"id":        "author1",
 		"name":      "Haruki Murakami",
 		"birthdate": "1949",
 		"biography": "Japanese"})
@@ -116,9 +112,8 @@ func TestGetRecords(t *testing.T) {
 		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
 	resMaps := decodeToMaps(t, res.Body)
-	// There is one extra empty map because of the way the template is defined
-	if len(resMaps) != 5 {
-		t.Errorf("expected 5 maps but got %v", len(resMaps))
+	if len(resMaps) != 4 {
+		t.Errorf("expected 4 maps but got %v", len(resMaps))
 	}
 	findMapInSlice(t, resMaps, map[string]string{
 		"name":     "Norwegian Wood",
@@ -142,20 +137,23 @@ func TestAddRecord(t *testing.T) {
 		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
 	// Check the response to the request
-	fields := decodeToFields(t, res.Body)
+	fields := decodeToMap(t, res.Body)
 	checkValues(t, fields, map[string]string{
+		"id":       "book5",
 		"name":     "The Wind-Up Bird Chronicle",
 		"year":     "1995",
 		"author":   "author1",
-		"synopsis": "novel"})
+		"synopsis": "novel",
+		"_success": "_"})
 	// Check getting the same record to make sure it's properly stored
-	req = httptest.NewRequest("GET", "/book?id="+fields["id"].Value, nil)
+	req = httptest.NewRequest("GET", "/book?id="+fields["id"], nil)
 	res = handle(req)
 	if res.StatusCode != 200 {
 		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
-	fields = decodeToFields(t, res.Body)
+	fields = decodeToMap(t, res.Body)
 	checkValues(t, fields, map[string]string{
+		"id":       "book5",
 		"name":     "The Wind-Up Bird Chronicle",
 		"year":     "1995",
 		"author":   "author1",
@@ -172,12 +170,15 @@ func TestAddRecordValidationFail(t *testing.T) {
 		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
 	// Check the response to the request
-	fields := decodeToFields(t, res.Body)
-	checkValidation(t, fields, map[string]bool{
-		"name":     true,
-		"year":     true,
-		"author":   true,
-		"synopsis": false})
+	fields := decodeToMap(t, res.Body)
+	checkValues(t, fields, map[string]string{
+		"name":         "the wind-up bird chronicle",
+		"year":         "95",
+		"author":       "author4",
+		"synopsis":     "novel",
+		"_name_fail":   "_",
+		"_year_fail":   "_",
+		"_author_fail": "_"})
 	// @TODO: Check that the record hasn't been added
 }
 
@@ -191,19 +192,21 @@ func TestUpdateRecord(t *testing.T) {
 		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
 	// Check the response to the request
-	fields := decodeToFields(t, res.Body)
+	fields := decodeToMap(t, res.Body)
 	checkValues(t, fields, map[string]string{
 		"id":        "author3",
 		"name":      "Miguel De Cervantes Saavedra",
 		"birthdate": "1547",
-		"biography": "Spanish"})
+		"biography": "Spanish",
+		"_success":  "_"})
 	// Check getting the same record to make sure it's properly stored
-	req = httptest.NewRequest("GET", "/author?id="+fields["id"].Value, nil)
+	req = httptest.NewRequest("GET", "/author?id="+fields["id"], nil)
 	res = handle(req)
 	if res.StatusCode != 200 {
 		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
-	fields = decodeToFields(t, res.Body)
+	fields = decodeToMap(t, res.Body)
+	// Check the response to the request
 	checkValues(t, fields, map[string]string{
 		"id":        "author3",
 		"name":      "Miguel De Cervantes Saavedra",
@@ -221,21 +224,20 @@ func TestUpdateRecordValidationFail(t *testing.T) {
 		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
 	// Check the response to the request
-	fields := decodeToFields(t, res.Body)
+	fields := decodeToMap(t, res.Body)
 	checkValues(t, fields, map[string]string{
-		"id":        "author2",
-		"name":      "george orwell",
-		"birthdate": "MCMIII"})
-	checkValidation(t, fields, map[string]bool{
-		"name":      true,
-		"birthdate": true})
+		"id":              "author2",
+		"name":            "george orwell",
+		"birthdate":       "MCMIII",
+		"_name_fail":      "_",
+		"_birthdate_fail": "_"})
 	// Check getting the same record to make sure it hasn't changed
-	req = httptest.NewRequest("GET", "/author?id="+fields["id"].Value, nil)
+	req = httptest.NewRequest("GET", "/author?id="+fields["id"], nil)
 	res = handle(req)
 	if res.StatusCode != 200 {
 		t.Errorf("expected status code 200 but got %v", res.StatusCode)
 	}
-	fields = decodeToFields(t, res.Body)
+	fields = decodeToMap(t, res.Body)
 	checkValues(t, fields, map[string]string{
 		"id":        "author2",
 		"name":      "George Orwell",
@@ -243,7 +245,7 @@ func TestUpdateRecordValidationFail(t *testing.T) {
 		"biography": "English"})
 }
 
-func decodeToFields(t *testing.T, reader io.ReadCloser) (m map[string]templateField) {
+func decodeToMap(t *testing.T, reader io.ReadCloser) (m map[string]string) {
 	t.Helper()
 	defer reader.Close()
 	// Decode the JSON
@@ -297,32 +299,21 @@ func findMapInSlice(t *testing.T, subjectMaps []map[string]string, checks map[st
 	t.Errorf("couldn't find a map that matches %v", checks)
 }
 
-// checkValues checks that the values of templateFields matches the checks
-func checkValues(t *testing.T, templateFields map[string]templateField, checks map[string]string) {
+// checkValues checks that the values of templateData matches the checks
+func checkValues(t *testing.T, templateData map[string]string, checks map[string]string) {
 	t.Helper()
 	for key, checkValue := range checks {
-		if field, found := templateFields[key]; found {
-			if field.Value != checkValue {
-				t.Errorf("field \"%v\" value \"%v\" should be \"%v\"", key, field.Value, checkValue)
+		if value, found := templateData[key]; found {
+			if value != checkValue {
+				t.Errorf("field \"%v\" value \"%v\" should be \"%v\"", key, value, checkValue)
 			}
 		} else {
 			t.Errorf("field \"%v\" not found", key)
 		}
 	}
-}
-
-// checkValidation checks that the validation of templateFields matches the checks
-func checkValidation(t *testing.T, templateFields map[string]templateField, checks map[string]bool) {
-	t.Helper()
-	for key, checkFailed := range checks {
-		if field, found := templateFields[key]; found {
-			if field.FailedValidation && !checkFailed {
-				t.Errorf("field \"%v\" shouldn't have failed validation", key)
-			} else if !field.FailedValidation && checkFailed {
-				t.Errorf("field \"%v\" should have failed validation", key)
-			}
-		} else {
-			t.Errorf("field \"%v\" not found", key)
+	for key, _ := range templateData {
+		if _, found := checks[key]; !found {
+			t.Errorf("field \"%v\" not expected", key)
 		}
 	}
 }
@@ -336,5 +327,5 @@ func handle(req *http.Request) *http.Response {
 func initialize() {
 	db := initializedDB()
 	formats.Initialize(db)
-	server.Initialize(context.Background(), "", "web", db)
+	server.Initialize("", "web", db)
 }

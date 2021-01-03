@@ -72,19 +72,21 @@ func Merge(validators map[string]validators.Validator, pRecord, sRecord map[stri
 	return mRecord
 }
 
-// Validate takes a record and returns a slice with the names of the fields that failed the validation of the format
+// Validate takes a record and returns a map with the fields that failed the validation of the format
 func Validate(ctx context.Context, validators map[string]validators.Validator,
-	record map[string]string) (failed map[string]struct{}) {
+	record map[string]string) (failed map[string]string) {
 
-	failed = make(map[string]struct{})
+	failed = make(map[string]string)
 	for name, value := range record {
 		if name != "id" {
 			if validator, found := validators[name]; found {
 				if !validator.Validate(ctx, value) {
-					failed[name] = struct{}{}
+					// Underscore value because empty string is empty pipeline in the template
+					failed["_"+name+"_fail"] = "_"
 				}
 			} else {
-				failed[name] = struct{}{}
+				// Underscore value because empty string is empty pipeline in the template
+				failed["_"+name+"_fail"] = "_"
 			}
 		}
 	}

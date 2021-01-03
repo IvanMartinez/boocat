@@ -1,32 +1,32 @@
 <html>
 {{if and ._success .id}}
-<meta http-equiv="refresh" content="0; URL=/author?id={{.id.Value}}" />
+<meta http-equiv="refresh" content="0; URL=/author?id={{.id}}" />
 {{- else}}
 
 <h1>Editing author</h1>
 
 {{if .id}}
-<form action="/edit/author?id={{.id.Value}}" method="POST">
-<input type="hidden" id="id" name="id" value="{{.id.Value}}">
+<form action="/edit/author?id={{.id}}" method="POST">
+<input type="hidden" id="id" name="id" value="{{.id}}">
 {{else}}
 <form action="/edit/author" method="POST">
 {{end}}
 <div>
-Name: <input type="text" id="name" name="name" value="{{.name.Value}}"/>
+Name: <input type="text" id="name" name="name" value="{{.name}}"/>
 </div>
-{{if .name.FailedValidation}}
+{{if ._name_fail}}
 <div style="color:red">Fail</div>
 {{end}}
 <div>
-Year of birth: <input type="text" id="birthdate" name="birthdate" value="{{.birthdate.Value}}"/>
+Year of birth: <input type="text" id="birthdate" name="birthdate" value="{{.birthdate}}"/>
 </div>
-{{if .birthdate.FailedValidation}}
+{{if ._birthdate_fail}}
 <div style="color:red">Fail</div>
 {{end}}
 <div>
-Biography: <input type="text" id="biography" name="biography" value="{{.biography.Value}}"/>
+Biography: <input type="text" id="biography" name="biography" value="{{.biography}}"/>
 </div>
-{{if .biography.FailedValidation}}
+{{if ._biography_fail}}
 <div style="color:red">Fail</div>
 {{end}}
 <div>
