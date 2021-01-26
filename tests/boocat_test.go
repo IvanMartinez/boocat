@@ -325,7 +325,7 @@ func handle(req *http.Request) *http.Response {
 }
 
 func initialize() {
+	formats.Initialize()
 	db := initializedDB()
-	formats.Initialize(db)
 	server.Initialize("", "web", db)
 }

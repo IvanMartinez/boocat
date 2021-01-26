@@ -113,7 +113,7 @@ func listRecords(ctx context.Context, formatName string) []map[string]string {
 	return records
 }
 
-// search returns a slice of the records of a format (authors, books...) whose search field contains the value
+// searchRecords returns a slice of the records of a format (authors, books...) whose search fields contains the value
 func searchRecords(ctx context.Context, formatName string, search string) []map[string]string {
 	records, err := db.SearchRecord(ctx, formatName, search)
 	if err != nil {

@@ -92,6 +92,11 @@ func (db *MockDB) GetRecord(ctx context.Context, format, id string) (map[string]
 	return nil, errors.New("format not found")
 }
 
+func (db *MockDB) SearchRecord(ctx context.Context, format string, value string) ([]map[string]string, error) {
+	// @TODO: Implement
+	return nil, nil
+}
+
 // LastID takes a format and returns the database ID of the last record of
 // that format inserted in the database. This is used in testing to be able to
 // retrieve the record and check its values.

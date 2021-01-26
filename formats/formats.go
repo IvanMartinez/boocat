@@ -6,7 +6,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/ivanmartinez/boocat/database"
 	"github.com/ivanmartinez/boocat/validators"
 )
 
@@ -16,54 +15,47 @@ type Format struct {
 	Name string
 	// Field names and validators
 	Fields map[string]validators.Validator
-	// Name of the searchable field
-	Searchable string
+	// Name of the searchable fields
+	Searchable map[string]struct{}
 }
 
 // Map of available formats. A format is a map of field names and validators.
-var formats map[string]Format
+var Formats map[string]Format
 
 // Initialize initializes the formats
-func Initialize(db database.DB) {
-	formats = make(map[string]Format)
+func Initialize() {
+	Formats = make(map[string]Format)
 
 	nameValidator, _ := validators.NewRegExpValidator(
 		"^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
 	yearValidator, _ := validators.NewRegExpValidator("^[1|2][0-9]{3}$")
-	authorValidator := validators.NewReferenceValidator(db, "author")
 
-	formats["author"] = Format{
+	Formats["author"] = Format{
 		Name: "author",
 		Fields: map[string]validators.Validator{
 			"name":      nameValidator,
 			"birthdate": yearValidator,
 			"biography": validators.NewNilValidator(),
 		},
-		Searchable: "name",
+		Searchable: map[string]struct{}{"name": struct{}{}},
 	}
 
-	formats["book"] = Format{
+	Formats["book"] = Format{
 		Name: "book",
 		Fields: map[string]validators.Validator{
 			"name":     nameValidator,
 			"year":     yearValidator,
-			"author":   authorValidator,
+			"author":   validators.NewNilValidator(),
 			"synopsis": validators.NewNilValidator(),
 		},
-		Searchable: "name",
+		Searchable: map[string]struct{}{"name": struct{}{}},
 	}
-}
-
-// Get returns a format
-func Get(name string) (Format, bool) {
-	format, found := formats[name]
-	return format, found
 }
 
 // FormatForTemplate returns the format whose name matches the ending of the template name, and a boolean indicating
 // if the format was found
 func FormatForTemplate(templateName string) (Format, bool) {
-	for formatName, format := range formats {
+	for formatName, format := range Formats {
 		if strings.HasSuffix(templateName, formatName) {
 			return format, true
 		}
@@ -118,4 +110,17 @@ func (f Format) Validate(ctx context.Context, record map[string]string) (failed 
 		}
 	}
 	return failed
+}
+
+// SearchableAre returns if the searchable fields are the same as the ones passed as parameters
+func (f Format) SearchableAre(fields map[string]struct{}) bool {
+	if len(f.Searchable) != len(fields) {
+		return false
+	}
+	for field, _ := range fields {
+		if _, found := f.Searchable[field]; !found {
+			return false
+		}
+	}
+	return true
 }

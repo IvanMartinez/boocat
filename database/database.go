@@ -3,12 +3,14 @@ package database
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
+	"github.com/ivanmartinez/boocat/formats"
 	"github.com/ivanmartinez/boocat/log"
 )
 
@@ -34,9 +36,14 @@ type mongoDB struct {
 	collections map[string]*mongo.Collection
 }
 
-// Connect connects to the database and initializes the collections
+type textIndex struct {
+	name   string
+	fields map[string]struct{}
+}
+
+// Initialize connects to the database and initializes the collections
 // @TODO: Maybe the initialization of collections should be separated
-func Connect(ctx context.Context, dbURI *string, formats []string) *mongoDB {
+func Initialize(ctx context.Context, dbURI *string, formats map[string]formats.Format) *mongoDB {
 
 	// Create and connect the client
 	cli, err := mongo.NewClient(options.Client().ApplyURI(*dbURI))
@@ -52,13 +59,77 @@ func Connect(ctx context.Context, dbURI *string, formats []string) *mongoDB {
 	db := cli.Database(dbName)
 	collections := make(map[string]*mongo.Collection, len(formats))
 	for _, format := range formats {
-		collections[format] = db.Collection(format)
+		collection := db.Collection(format.Name)
+		collections[format.Name] = collection
+		indexes := collection.Indexes()
+		if index, ok := findTextIndex(ctx, indexes); ok {
+			fmt.Printf(">>> Decoded text index %v\n", index)
+			if format.SearchableAre(index.fields) {
+				fmt.Println("Everything ok")
+			} else {
+				//indexes.DropOne(ctx, index.name)
+				indexModel := mongo.IndexModel{
+					Keys: bson.D{{"name", 1}, {"email", 1}},
+				}
+				indexes.CreateOne(ctx, indexModel)
+				fmt.Println("Update text index")
+			}
+		} else {
+			fmt.Println("Add missing index")
+		}
 	}
 
 	return &mongoDB{
 		client:      cli,
 		collections: collections,
 	}
+}
+
+func findTextIndex(ctx context.Context, indexes mongo.IndexView) (textIndex, bool) {
+	// Iterate through the collection's indexes
+	cursor, err := indexes.List(ctx)
+	if err != nil {
+		log.Error.Fatal(err)
+	}
+	var result bson.M
+	for cursor.Next(ctx) {
+		err := cursor.Decode(&result)
+		if err != nil {
+			log.Error.Fatal(err)
+		}
+		if keyValue, found := result["key"]; found {
+			if keyMap, ok := keyValue.(bson.M); ok {
+				if keyMap["_fts"] == "text" {
+					// It's a text index. Get the name.
+					if name, ok := result["name"].(string); ok {
+						index := textIndex{
+							name:   name,
+							fields: map[string]struct{}{},
+						}
+						// Get the fields
+						if weightsValue, found := result["weights"]; found {
+							if weightsMap, ok := weightsValue.(bson.M); ok {
+								for field, _ := range weightsMap {
+									index.fields[field] = struct{}{}
+								}
+							}
+						}
+						// Return the index data
+						return index, true
+					}
+				}
+			}
+		}
+	}
+	// No text index found
+	return textIndex{}, false
+}
+
+func makeTextIndex(format formats.Format) mongo.IndexModel {
+	indexModel := mongo.IndexModel{
+		Keys: bson.D{{"name", 1}, {"email", 1}},
+	}
+	return indexModel
 }
 
 // Disconnect disconnects the database
@@ -102,8 +173,7 @@ func (db *mongoDB) GetRecord(ctx context.Context, format, id string) (map[string
 		// Get ObjectID as used by MongoDB
 		objectID, _ := primitive.ObjectIDFromHex(id)
 		var document map[string]string
-		err := col.FindOne(context.TODO(),
-			bson.M{"_id": objectID}).Decode(&document)
+		err := col.FindOne(ctx, bson.M{"_id": objectID}).Decode(&document)
 		if err != nil {
 			return nil, err
 		}
@@ -120,7 +190,7 @@ func (db *mongoDB) GetAllRecords(ctx context.Context, format string) ([]map[stri
 			return nil, err
 		}
 		var documents []map[string]string
-		if err = cursor.All(context.TODO(), &documents); err != nil {
+		if err = cursor.All(ctx, &documents); err != nil {
 			return nil, err
 		}
 		return documentsToRecords(documents), nil
@@ -132,7 +202,7 @@ func (db *mongoDB) GetAllRecords(ctx context.Context, format string) ([]map[stri
 func (db *mongoDB) SearchRecord(ctx context.Context, format string, value string) ([]map[string]string, error) {
 	if col, found := db.collections[format]; found {
 		// { $text: { $search: "Coffee", $caseSensitive: true } }
-		cursor, err := col.Find(context.TODO(), bson.M{"$text": bson.M{"$search": value}})
+		cursor, err := col.Find(ctx, bson.M{"$text": bson.M{"$search": value}})
 		if err != nil {
 			return nil, err
 		}
