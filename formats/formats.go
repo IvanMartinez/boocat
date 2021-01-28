@@ -37,7 +37,7 @@ func Initialize() {
 			"birthdate": yearValidator,
 			"biography": validators.NewNilValidator(),
 		},
-		Searchable: map[string]struct{}{"name": struct{}{}},
+		Searchable: map[string]struct{}{"name": {}, "biography": {}},
 	}
 
 	Formats["book"] = Format{
@@ -48,7 +48,7 @@ func Initialize() {
 			"author":   validators.NewNilValidator(),
 			"synopsis": validators.NewNilValidator(),
 		},
-		Searchable: map[string]struct{}{"name": struct{}{}},
+		Searchable: map[string]struct{}{"name": {}, "synopsis": {}},
 	}
 }
 
@@ -117,7 +117,7 @@ func (f Format) SearchableAre(fields map[string]struct{}) bool {
 	if len(f.Searchable) != len(fields) {
 		return false
 	}
-	for field, _ := range fields {
+	for field := range fields {
 		if _, found := f.Searchable[field]; !found {
 			return false
 		}

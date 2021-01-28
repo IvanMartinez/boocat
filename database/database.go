@@ -3,7 +3,6 @@ package database
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -36,6 +35,7 @@ type mongoDB struct {
 	collections map[string]*mongo.Collection
 }
 
+// Name and fields of a collection text index
 type textIndex struct {
 	name   string
 	fields map[string]struct{}
@@ -50,8 +50,7 @@ func Initialize(ctx context.Context, dbURI *string, formats map[string]formats.F
 	if err != nil {
 		log.Error.Fatal(err)
 	}
-	err = cli.Connect(ctx)
-	if err != nil {
+	if err = cli.Connect(ctx); err != nil {
 		log.Error.Fatal(err)
 	}
 
@@ -63,19 +62,22 @@ func Initialize(ctx context.Context, dbURI *string, formats map[string]formats.F
 		collections[format.Name] = collection
 		indexes := collection.Indexes()
 		if index, ok := findTextIndex(ctx, indexes); ok {
-			fmt.Printf(">>> Decoded text index %v\n", index)
-			if format.SearchableAre(index.fields) {
-				fmt.Println("Everything ok")
-			} else {
-				//indexes.DropOne(ctx, index.name)
-				indexModel := mongo.IndexModel{
-					Keys: bson.D{{"name", 1}, {"email", 1}},
+			if !format.SearchableAre(index.fields) {
+				if _, err := indexes.DropOne(ctx, index.name); err != nil {
+					log.Error.Fatal(err)
 				}
-				indexes.CreateOne(ctx, indexModel)
-				fmt.Println("Update text index")
+				indexModel := textIndexModel(format)
+				if _, err := indexes.CreateOne(ctx, indexModel); err != nil {
+					log.Error.Fatal(err)
+				}
+				log.Info.Printf("Updated text index for %v", format.Name)
 			}
 		} else {
-			fmt.Println("Add missing index")
+			indexModel := textIndexModel(format)
+			if _, err := indexes.CreateOne(ctx, indexModel); err != nil {
+				log.Error.Fatal(err)
+			}
+			log.Info.Printf("Created text index for %v", format.Name)
 		}
 	}
 
@@ -83,53 +85,6 @@ func Initialize(ctx context.Context, dbURI *string, formats map[string]formats.F
 		client:      cli,
 		collections: collections,
 	}
-}
-
-func findTextIndex(ctx context.Context, indexes mongo.IndexView) (textIndex, bool) {
-	// Iterate through the collection's indexes
-	cursor, err := indexes.List(ctx)
-	if err != nil {
-		log.Error.Fatal(err)
-	}
-	var result bson.M
-	for cursor.Next(ctx) {
-		err := cursor.Decode(&result)
-		if err != nil {
-			log.Error.Fatal(err)
-		}
-		if keyValue, found := result["key"]; found {
-			if keyMap, ok := keyValue.(bson.M); ok {
-				if keyMap["_fts"] == "text" {
-					// It's a text index. Get the name.
-					if name, ok := result["name"].(string); ok {
-						index := textIndex{
-							name:   name,
-							fields: map[string]struct{}{},
-						}
-						// Get the fields
-						if weightsValue, found := result["weights"]; found {
-							if weightsMap, ok := weightsValue.(bson.M); ok {
-								for field, _ := range weightsMap {
-									index.fields[field] = struct{}{}
-								}
-							}
-						}
-						// Return the index data
-						return index, true
-					}
-				}
-			}
-		}
-	}
-	// No text index found
-	return textIndex{}, false
-}
-
-func makeTextIndex(format formats.Format) mongo.IndexModel {
-	indexModel := mongo.IndexModel{
-		Keys: bson.D{{"name", 1}, {"email", 1}},
-	}
-	return indexModel
 }
 
 // Disconnect disconnects the database
@@ -213,6 +168,58 @@ func (db *mongoDB) SearchRecord(ctx context.Context, format string, value string
 		return documentsToRecords(documents), nil
 	}
 	return nil, errors.New("format not found")
+}
+
+// findTextIndex looks for a text index in the passed indexes and returns it if found
+func findTextIndex(ctx context.Context, indexes mongo.IndexView) (textIndex, bool) {
+	// Iterate through the collection's indexes
+	cursor, err := indexes.List(ctx)
+	if err != nil {
+		log.Error.Fatal(err)
+	}
+	var result bson.M
+	for cursor.Next(ctx) {
+		err := cursor.Decode(&result)
+		if err != nil {
+			log.Error.Fatal(err)
+		}
+		if keyValue, found := result["key"]; found {
+			if keyMap, ok := keyValue.(bson.M); ok {
+				if keyMap["_fts"] == "text" {
+					// It's a text index. Get the name.
+					if name, ok := result["name"].(string); ok {
+						index := textIndex{
+							name:   name,
+							fields: map[string]struct{}{},
+						}
+						// Get the fields
+						if weightsValue, found := result["weights"]; found {
+							if weightsMap, ok := weightsValue.(bson.M); ok {
+								for field := range weightsMap {
+									index.fields[field] = struct{}{}
+								}
+							}
+						}
+						// Return the index data
+						return index, true
+					}
+				}
+			}
+		}
+	}
+	// No text index found
+	return textIndex{}, false
+}
+
+// textIndexModel returns the model to create a text index that matches the searchable fields of the format
+func textIndexModel(format formats.Format) mongo.IndexModel {
+	keys := make(bson.D, 0, len(format.Searchable))
+	for field := range format.Searchable {
+		keys = append(keys, primitive.E{Key: field, Value: "text"})
+	}
+	return mongo.IndexModel{
+		Keys: keys,
+	}
 }
 
 func splitID(record map[string]string) (id string, recordNoID map[string]string) {
