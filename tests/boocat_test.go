@@ -127,6 +127,24 @@ func TestGetRecords(t *testing.T) {
 		"synopsys": "dystopia"})
 }
 
+func TestSearchRecords(t *testing.T) {
+	initialize()
+	req := httptest.NewRequest("GET", "/list/author?_search=orwell", nil)
+	res := handle(req)
+	if res.StatusCode != 200 {
+		t.Errorf("expected status code 200 but got %v", res.StatusCode)
+	}
+	resMaps := decodeToMaps(t, res.Body)
+	if len(resMaps) != 1 {
+		t.Errorf("expected 1 map but got %v", len(resMaps))
+	}
+	findMapInSlice(t, resMaps, map[string]string{
+		"name":      "George Orwell",
+		"birthdate": "1903",
+		"biography": "English",
+	})
+}
+
 func TestAddRecord(t *testing.T) {
 	initialize()
 	req := httptest.NewRequest("POST", "/book", strings.NewReader("name=The Wind-Up Bird Chronicle&year=1995&"+
@@ -163,7 +181,7 @@ func TestAddRecord(t *testing.T) {
 func TestAddRecordValidationFail(t *testing.T) {
 	initialize()
 	req := httptest.NewRequest("POST", "/book", strings.NewReader("name=the wind-up bird chronicle&year=95&"+
-		"author=author4&synopsis=novel"))
+		"author=author1&synopsis=novel"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	res := handle(req)
 	if res.StatusCode != 200 {
@@ -172,13 +190,13 @@ func TestAddRecordValidationFail(t *testing.T) {
 	// Check the response to the request
 	fields := decodeToMap(t, res.Body)
 	checkValues(t, fields, map[string]string{
-		"name":         "the wind-up bird chronicle",
-		"year":         "95",
-		"author":       "author4",
-		"synopsis":     "novel",
-		"_name_fail":   "_",
-		"_year_fail":   "_",
-		"_author_fail": "_"})
+		"name":       "the wind-up bird chronicle",
+		"year":       "95",
+		"author":     "author1",
+		"synopsis":   "novel",
+		"_name_fail": "_",
+		"_year_fail": "_",
+	})
 	// @TODO: Check that the record hasn't been added
 }
 
@@ -311,7 +329,7 @@ func checkValues(t *testing.T, templateData map[string]string, checks map[string
 			t.Errorf("field \"%v\" not found", key)
 		}
 	}
-	for key, _ := range templateData {
+	for key := range templateData {
 		if _, found := checks[key]; !found {
 			t.Errorf("field \"%v\" not expected", key)
 		}
