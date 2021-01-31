@@ -153,11 +153,11 @@ func (db *mongoDB) GetAllRecords(ctx context.Context, format string) ([]map[stri
 	return nil, errors.New("format not found")
 }
 
-// SearchRecord
-func (db *mongoDB) SearchRecord(ctx context.Context, format string, value string) ([]map[string]string, error) {
+// SearchRecord returns all records of a specific format from the database that matches the search term
+func (db *mongoDB) SearchRecord(ctx context.Context, format string, search string) ([]map[string]string, error) {
 	if col, found := db.collections[format]; found {
 		// { $text: { $search: "Coffee", $caseSensitive: true } }
-		cursor, err := col.Find(ctx, bson.M{"$text": bson.M{"$search": value}})
+		cursor, err := col.Find(ctx, bson.M{"$text": bson.M{"$search": search}})
 		if err != nil {
 			return nil, err
 		}

@@ -55,7 +55,7 @@ func (db *MockDB) AddRecord(_ context.Context, format string, record map[string]
 	return "", errors.New("format not found")
 }
 
-// Update updates a record (author, book...)
+// UpdateRecord updates a record (author, book...)
 func (db *MockDB) UpdateRecord(_ context.Context, format string, record map[string]string) error {
 	if rSet, found := db.recordSets[format]; found {
 		if id, found := record["id"]; found {
@@ -67,7 +67,18 @@ func (db *MockDB) UpdateRecord(_ context.Context, format string, record map[stri
 	return errors.New("format not found")
 }
 
-// GetAll returns all records of a specific format from the database
+// GetRecord returns a record from the database by the id field
+func (db *MockDB) GetRecord(_ context.Context, format, id string) (map[string]string, error) {
+	if rSet, found := db.recordSets[format]; found {
+		if record, found := rSet.records[id]; found {
+			return record, nil
+		}
+		return nil, fmt.Errorf("unknown record %v", id)
+	}
+	return nil, errors.New("format not found")
+}
+
+// GetAllRecords returns all records of a specific format from the database
 func (db *MockDB) GetAllRecords(_ context.Context, format string) ([]map[string]string, error) {
 	if rSet, found := db.recordSets[format]; found {
 		// Convert from map of records to slice of records
@@ -78,17 +89,6 @@ func (db *MockDB) GetAllRecords(_ context.Context, format string) ([]map[string]
 			i++
 		}
 		return slice, nil
-	}
-	return nil, errors.New("format not found")
-}
-
-// Get returns a record from the database
-func (db *MockDB) GetRecord(_ context.Context, format, id string) (map[string]string, error) {
-	if rSet, found := db.recordSets[format]; found {
-		if record, found := rSet.records[id]; found {
-			return record, nil
-		}
-		return nil, fmt.Errorf("unknown record %v", id)
 	}
 	return nil, errors.New("format not found")
 }

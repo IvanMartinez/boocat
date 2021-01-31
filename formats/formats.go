@@ -19,7 +19,7 @@ type Format struct {
 	Searchable map[string]struct{}
 }
 
-// Map of available formats. A format is a map of field names and validators.
+// Map of available formats
 var Formats map[string]Format
 
 // Initialize initializes the formats
