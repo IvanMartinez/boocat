@@ -7,7 +7,6 @@ import (
 	"github.com/ivanmartinez/boocat/database"
 	"github.com/ivanmartinez/boocat/formats"
 	"github.com/ivanmartinez/boocat/log"
-	"github.com/ivanmartinez/boocat/validators"
 	"github.com/ivanmartinez/boocat/webfiles"
 )
 
@@ -69,10 +68,10 @@ func handleWithTemplate(w http.ResponseWriter, r *http.Request, template *webfil
 	formValues := submittedFormValues(r)
 	var data interface{}
 	if r.Method == "GET" {
-		data = handleGet(r.Context(), template.FormatName, template.Format, formValues)
+		data = handleGet(r.Context(), template.Format, formValues)
 	} else {
 		// POST
-		data = handlePost(r.Context(), template.FormatName, template.Format, formValues)
+		data = handlePost(r.Context(), template.Format, formValues)
 	}
 	err := template.Write(w, data)
 	if err != nil {
@@ -80,36 +79,33 @@ func handleWithTemplate(w http.ResponseWriter, r *http.Request, template *webfil
 	}
 }
 
-func handleGet(ctx context.Context, formatName string, format map[string]validators.Validator,
-	params map[string]string) interface{} {
-
+func handleGet(ctx context.Context, format formats.Format, params map[string]string) interface{} {
 	if _, found := params["id"]; found {
-		return getRecord(ctx, formatName, format, params)
+		return getRecord(ctx, format, params)
 	}
-	return list(ctx, formatName)
+	if search, found := params["_search"]; found {
+		return searchRecords(ctx, format.Name, search)
+	}
+	return listRecords(ctx, format.Name)
 }
 
-func handlePost(ctx context.Context, formatName string, format map[string]validators.Validator,
-	params map[string]string) interface{} {
-
+func handlePost(ctx context.Context, format formats.Format, params map[string]string) interface{} {
 	if _, found := params["id"]; found {
-		return updateRecord(ctx, formatName, format, params)
+		return updateRecord(ctx, format, params)
 	}
-	return newRecord(ctx, formatName, format, params)
+	return newRecord(ctx, format, params)
 }
 
 // getRecord returns a record of a format (author, book...)
-func getRecord(ctx context.Context, formatName string, format map[string]validators.Validator,
-	record map[string]string) map[string]string {
+func getRecord(ctx context.Context, format formats.Format, record map[string]string) map[string]string {
 	// If record contains all the fields (from previous template), don't query the database
-	// @TODO: This will produce very long URLs, better use a database memory cache
-	record = fillFromDatabase(ctx, record, formatName, format)
+	record = fillFromDatabase(ctx, record, format)
 	return record
 }
 
-// list returns a slice of all records of a format (authors, books...)
-func list(ctx context.Context, format string) []map[string]string {
-	records, err := db.GetAllRecords(ctx, format)
+// listRecords returns a slice of all records of a format (authors, books...)
+func listRecords(ctx context.Context, formatName string) []map[string]string {
+	records, err := db.GetAllRecords(ctx, formatName)
 	if err != nil {
 		log.Error.Printf("getting records from database: %v\n", err)
 		return nil
@@ -117,15 +113,23 @@ func list(ctx context.Context, format string) []map[string]string {
 	return records
 }
 
-// newRecord adds a record of a format (author, book...)
-func newRecord(ctx context.Context, formatName string, format map[string]validators.Validator,
-	record map[string]string) map[string]string {
+// searchRecords returns a slice of the records of a format (authors, books...) whose search fields contains the value
+func searchRecords(ctx context.Context, formatName string, search string) []map[string]string {
+	records, err := db.SearchRecord(ctx, formatName, search)
+	if err != nil {
+		log.Error.Printf("searching records in database: %v\n", err)
+		return nil
+	}
+	return records
+}
 
+// newRecord adds a record of a format (author, book...)
+func newRecord(ctx context.Context, format formats.Format, record map[string]string) map[string]string {
 	tplData := make(map[string]string)
-	failed := formats.Validate(ctx, format, record)
+	failed := format.Validate(ctx, record)
 	tplData = add(tplData, failed)
 	if len(failed) == 0 {
-		id, err := db.AddRecord(ctx, formatName, record)
+		id, err := db.AddRecord(ctx, format.Name, record)
 		if err != nil {
 			log.Error.Printf("adding record to database: %v\n", err)
 		} else {
@@ -139,16 +143,13 @@ func newRecord(ctx context.Context, formatName string, format map[string]validat
 }
 
 // updateRecord updates a record of a format (author, book...)
-func updateRecord(ctx context.Context, formatName string, format map[string]validators.Validator,
-	record map[string]string) map[string]string {
-
-	// @TODO: This is messy, refactor
+func updateRecord(ctx context.Context, format formats.Format, record map[string]string) map[string]string {
 	tplData := make(map[string]string)
-	failed := formats.Validate(ctx, format, record)
+	failed := format.Validate(ctx, record)
 	tplData = add(tplData, failed)
 	if len(failed) == 0 {
-		record = fillFromDatabase(ctx, record, formatName, format)
-		if err := db.UpdateRecord(ctx, formatName, record); err != nil {
+		record = fillFromDatabase(ctx, record, format)
+		if err := db.UpdateRecord(ctx, format.Name, record); err != nil {
 			log.Error.Printf("updating record in database: %v\n", err)
 		} else {
 			// Underscore value because empty string is empty pipeline in the template
@@ -178,12 +179,10 @@ func submittedFormValues(r *http.Request) map[string]string {
 
 // fillFromDatabase If record is missing any field of the format, then get it from the database and return the filled
 // record
-func fillFromDatabase(ctx context.Context, record map[string]string, formatName string,
-	format map[string]validators.Validator) map[string]string {
-
-	if formats.IncompleteRecord(format, record) {
-		if dbRecord, err := db.GetRecord(ctx, formatName, record["id"]); err == nil {
-			record = formats.Merge(format, record, dbRecord)
+func fillFromDatabase(ctx context.Context, record map[string]string, format formats.Format) map[string]string {
+	if format.IncompleteRecord(record) {
+		if dbRecord, err := db.GetRecord(ctx, format.Name, record["id"]); err == nil {
+			record = format.Merge(record, dbRecord)
 		} else {
 			log.Error.Printf("getting record from database: %v\n", err)
 		}

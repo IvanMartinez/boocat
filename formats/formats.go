@@ -6,45 +6,66 @@ import (
 	"context"
 	"strings"
 
-	"github.com/ivanmartinez/boocat/database"
 	"github.com/ivanmartinez/boocat/validators"
 )
 
-// Map of available formats. A format is a map of field names and validators.
-var formats map[string]map[string]validators.Validator
+// Format definition
+type Format struct {
+	// Name of the format
+	Name string
+	// Field names and validators
+	Fields map[string]validators.Validator
+	// Name of the searchable fields
+	Searchable map[string]struct{}
+}
+
+// Map of available formats
+var Formats map[string]Format
 
 // Initialize initializes the formats
-func Initialize(db database.DB) {
-	formats = make(map[string]map[string]validators.Validator)
+func Initialize() {
+	Formats = make(map[string]Format)
 
 	nameValidator, _ := validators.NewRegExpValidator(
 		"^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
 	yearValidator, _ := validators.NewRegExpValidator("^[1|2][0-9]{3}$")
-	authorValidator := validators.NewReferenceValidator(db, "author")
 
-	formats["author"] = map[string]validators.Validator{
-		"name":      nameValidator,
-		"birthdate": yearValidator,
-		"biography": validators.NewNilValidator(),
+	Formats["author"] = Format{
+		Name: "author",
+		Fields: map[string]validators.Validator{
+			"name":      nameValidator,
+			"birthdate": yearValidator,
+			"biography": validators.NewNilValidator(),
+		},
+		Searchable: map[string]struct{}{"name": {}, "biography": {}},
 	}
 
-	formats["book"] = map[string]validators.Validator{
-		"name":     nameValidator,
-		"year":     yearValidator,
-		"author":   authorValidator,
-		"synopsis": validators.NewNilValidator(),
+	Formats["book"] = Format{
+		Name: "book",
+		Fields: map[string]validators.Validator{
+			"name":     nameValidator,
+			"year":     yearValidator,
+			"author":   validators.NewNilValidator(),
+			"synopsis": validators.NewNilValidator(),
+		},
+		Searchable: map[string]struct{}{"name": {}, "synopsis": {}},
 	}
 }
 
-// Get returns a format
-func Get(name string) (format map[string]validators.Validator, found bool) {
-	format, found = formats[name]
-	return format, found
+// FormatForTemplate returns the format whose name matches the ending of the template name, and a boolean indicating
+// if the format was found
+func FormatForTemplate(templateName string) (Format, bool) {
+	for formatName, format := range Formats {
+		if strings.HasSuffix(templateName, formatName) {
+			return format, true
+		}
+	}
+	return Format{}, false
 }
 
 // IncompleteRecord tells if the record doesn't have all the fields of the format
-func IncompleteRecord(validators map[string]validators.Validator, record map[string]string) bool {
-	for name := range validators {
+func (f Format) IncompleteRecord(record map[string]string) bool {
+	for name := range f.Fields {
 		if _, found := record[name]; !found {
 			return true
 		}
@@ -54,9 +75,9 @@ func IncompleteRecord(validators map[string]validators.Validator, record map[str
 
 // Merge returns a record with the fields and values of pRecord and sRecord that exist in the format plus id.
 // If a field exists in both records then the field and value is taken from pRecord.
-func Merge(validators map[string]validators.Validator, pRecord, sRecord map[string]string) (mRecord map[string]string) {
+func (f Format) Merge(pRecord, sRecord map[string]string) (mRecord map[string]string) {
 	mRecord = make(map[string]string)
-	for name := range validators {
+	for name := range f.Fields {
 		if value, found := pRecord[name]; found {
 			mRecord[name] = value
 		} else if value, found := sRecord[name]; found {
@@ -72,14 +93,12 @@ func Merge(validators map[string]validators.Validator, pRecord, sRecord map[stri
 	return mRecord
 }
 
-// Validate takes a record and returns a map with the fields that failed the validation of the format
-func Validate(ctx context.Context, validators map[string]validators.Validator,
-	record map[string]string) (failed map[string]string) {
-
+// Validate takes a record and returns a map with the fields that failed the validations of the format
+func (f Format) Validate(ctx context.Context, record map[string]string) (failed map[string]string) {
 	failed = make(map[string]string)
 	for name, value := range record {
 		if name != "id" {
-			if validator, found := validators[name]; found {
+			if validator, found := f.Fields[name]; found {
 				if !validator.Validate(ctx, value) {
 					// Underscore value because empty string is empty pipeline in the template
 					failed["_"+name+"_fail"] = "_"
@@ -93,12 +112,15 @@ func Validate(ctx context.Context, validators map[string]validators.Validator,
 	return failed
 }
 
-// FormatForTemplate returns the format whose name matches the ending of the template name, nil if it doesn't exist
-func FormatForTemplate(templateName string) (formatName string, format map[string]validators.Validator) {
-	for formatName, format := range formats {
-		if strings.HasSuffix(templateName, formatName) {
-			return formatName, format
+// SearchableAre returns if the searchable fields are the same as the ones passed as parameters
+func (f Format) SearchableAre(fields map[string]struct{}) bool {
+	if len(f.Searchable) != len(fields) {
+		return false
+	}
+	for field := range fields {
+		if _, found := f.Searchable[field]; !found {
+			return false
 		}
 	}
-	return "", nil
+	return true
 }

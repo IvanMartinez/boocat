@@ -31,8 +31,8 @@ func main() {
 	}()
 
 	// Start services
-	db := database.Connect(ctx, dbURI, []string{"author", "book"})
-	formats.Initialize(db)
+	formats.Initialize()
+	db := database.Initialize(ctx, dbURI, formats.Formats)
 	server.Initialize(*url, "bcweb", db)
 	server.Start()
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 // MockDB is a database mock for testing
@@ -26,12 +27,12 @@ type RecordSet struct {
 func NewDB() (db *MockDB) {
 	return &MockDB{
 		recordSets: map[string]*RecordSet{
-			"author": &RecordSet{
+			"author": {
 				name:         "author",
 				lastIDNumber: 0,
 				records:      make(map[string]map[string]string, 0),
 			},
-			"book": &RecordSet{
+			"book": {
 				name:         "book",
 				lastIDNumber: 0,
 				records:      make(map[string]map[string]string, 0),
@@ -41,7 +42,7 @@ func NewDB() (db *MockDB) {
 }
 
 // AddRecord adds a new record (author, book...)
-func (db *MockDB) AddRecord(ctx context.Context, format string, record map[string]string) (string, error) {
+func (db *MockDB) AddRecord(_ context.Context, format string, record map[string]string) (string, error) {
 	if rSet, found := db.recordSets[format]; found {
 		if _, found := record["id"]; found {
 			return "", errors.New("new record cannot have id")
@@ -54,8 +55,8 @@ func (db *MockDB) AddRecord(ctx context.Context, format string, record map[strin
 	return "", errors.New("format not found")
 }
 
-// Update updates a record (author, book...)
-func (db *MockDB) UpdateRecord(ctx context.Context, format string, record map[string]string) error {
+// UpdateRecord updates a record (author, book...)
+func (db *MockDB) UpdateRecord(_ context.Context, format string, record map[string]string) error {
 	if rSet, found := db.recordSets[format]; found {
 		if id, found := record["id"]; found {
 			rSet.records[id] = record
@@ -66,8 +67,19 @@ func (db *MockDB) UpdateRecord(ctx context.Context, format string, record map[st
 	return errors.New("format not found")
 }
 
-// GetAll returns all records of a specific format from the database
-func (db *MockDB) GetAllRecords(ctx context.Context, format string) ([]map[string]string, error) {
+// GetRecord returns a record from the database by the id field
+func (db *MockDB) GetRecord(_ context.Context, format, id string) (map[string]string, error) {
+	if rSet, found := db.recordSets[format]; found {
+		if record, found := rSet.records[id]; found {
+			return record, nil
+		}
+		return nil, fmt.Errorf("unknown record %v", id)
+	}
+	return nil, errors.New("format not found")
+}
+
+// GetAllRecords returns all records of a specific format from the database
+func (db *MockDB) GetAllRecords(_ context.Context, format string) ([]map[string]string, error) {
 	if rSet, found := db.recordSets[format]; found {
 		// Convert from map of records to slice of records
 		slice := make([]map[string]string, len(rSet.records), len(rSet.records))
@@ -81,13 +93,18 @@ func (db *MockDB) GetAllRecords(ctx context.Context, format string) ([]map[strin
 	return nil, errors.New("format not found")
 }
 
-// Get returns a record from the database
-func (db *MockDB) GetRecord(ctx context.Context, format, id string) (map[string]string, error) {
-	if rSet, found := db.recordSets[format]; found {
-		if record, found := rSet.records[id]; found {
-			return record, nil
+// SearchRecord returns all records of a specific format from the database that contains the search term in the value of
+// their fields
+func (db *MockDB) SearchRecord(_ context.Context, formatName, search string) ([]map[string]string, error) {
+	if rSet, found := db.recordSets[formatName]; found {
+		// Convert from map of records to slice of records
+		slice := make([]map[string]string, 0, len(rSet.records))
+		for _, record := range rSet.records {
+			if matchesSearch(record, search) {
+				slice = append(slice, record)
+			}
 		}
-		return nil, fmt.Errorf("unknown record %v", id)
+		return slice, nil
 	}
 	return nil, errors.New("format not found")
 }
@@ -113,4 +130,14 @@ func (rSet *RecordSet) lastID() string {
 func (rSet *RecordSet) nextID() string {
 	rSet.lastIDNumber++
 	return rSet.lastID()
+}
+
+// matchesSearch returns if the value of any field of the record contains the search term, case-insensitive.
+func matchesSearch(record map[string]string, search string) bool {
+	for _, value := range record {
+		if strings.Contains(strings.ToLower(value), strings.ToLower(search)) {
+			return true
+		}
+	}
+	return false
 }

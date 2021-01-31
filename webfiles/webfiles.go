@@ -9,14 +9,12 @@ import (
 
 	"github.com/ivanmartinez/boocat/formats"
 	"github.com/ivanmartinez/boocat/log"
-	"github.com/ivanmartinez/boocat/validators"
 )
 
 // Template contains a template.Template to generate output
 type Template struct {
-	template   *template.Template
-	FormatName string
-	Format     map[string]validators.Validator
+	template *template.Template
+	Format   formats.Format
 }
 
 // StaticFile contains the contents of a static file
@@ -107,8 +105,8 @@ func loadFile(rootPath, path string) {
 
 func loadTemplate(rootPath, path string) {
 	templateName := strings.TrimSuffix(path, filepath.Ext(path))
-	formatName, format := formats.FormatForTemplate(templateName)
-	if format == nil {
+	format, found := formats.FormatForTemplate(templateName)
+	if !found {
 		log.Error.Fatalf("template %v must end with the name of a format", path)
 	}
 	tmpl, err := template.ParseFiles(rootPath + path)
@@ -117,8 +115,7 @@ func loadTemplate(rootPath, path string) {
 	}
 	templates[strings.TrimSuffix(path, filepath.Ext(path))] =
 		&Template{
-			template:   tmpl,
-			FormatName: formatName,
-			Format:     format,
+			template: tmpl,
+			Format:   format,
 		}
 }
