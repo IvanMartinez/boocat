@@ -31,7 +31,7 @@ func main() {
 	}()
 
 	// Start services
-	formats.Initialize()
+	formats.InitializeFields()
 	db := database.Initialize(ctx, dbURI, formats.Formats)
 	server.Initialize(*url, "bcweb", db)
 	server.Start()

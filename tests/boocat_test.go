@@ -343,7 +343,8 @@ func handle(req *http.Request) *http.Response {
 }
 
 func initialize() {
-	formats.Initialize()
+	formats.InitializeFields()
 	db := initializedDB()
+	formats.InitializeValidators()
 	server.Initialize("", "web", db)
 }

@@ -14,43 +14,13 @@ type Format struct {
 	// Name of the format
 	Name string
 	// Field names and validators
-	Fields map[string]validators.Validator
+	Fields map[string]validators.Validate
 	// Name of the searchable fields
 	Searchable map[string]struct{}
 }
 
 // Map of available formats
 var Formats map[string]Format
-
-// Initialize initializes the formats
-func Initialize() {
-	Formats = make(map[string]Format)
-
-	nameValidator, _ := validators.NewRegExpValidator(
-		"^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
-	yearValidator, _ := validators.NewRegExpValidator("^[1|2][0-9]{3}$")
-
-	Formats["author"] = Format{
-		Name: "author",
-		Fields: map[string]validators.Validator{
-			"name":      nameValidator,
-			"birthdate": yearValidator,
-			"biography": validators.NewNilValidator(),
-		},
-		Searchable: map[string]struct{}{"name": {}, "biography": {}},
-	}
-
-	Formats["book"] = Format{
-		Name: "book",
-		Fields: map[string]validators.Validator{
-			"name":     nameValidator,
-			"year":     yearValidator,
-			"author":   validators.NewNilValidator(),
-			"synopsis": validators.NewNilValidator(),
-		},
-		Searchable: map[string]struct{}{"name": {}, "synopsis": {}},
-	}
-}
 
 // FormatForTemplate returns the format whose name matches the ending of the template name, and a boolean indicating
 // if the format was found
@@ -98,8 +68,8 @@ func (f Format) Validate(ctx context.Context, record map[string]string) (failed 
 	failed = make(map[string]string)
 	for name, value := range record {
 		if name != "id" {
-			if validator, found := f.Fields[name]; found {
-				if !validator.Validate(ctx, value) {
+			if validateFunc, found := f.Fields[name]; found {
+				if !validateFunc(ctx, value) {
 					// Underscore value because empty string is empty pipeline in the template
 					failed["_"+name+"_fail"] = "_"
 				}
