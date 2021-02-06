@@ -5,8 +5,6 @@ package formats
 import (
 	"context"
 	"strings"
-
-	"github.com/ivanmartinez/boocat/validators"
 )
 
 // Format definition
@@ -14,13 +12,16 @@ type Format struct {
 	// Name of the format
 	Name string
 	// Field names and validators
-	Fields map[string]validators.Validate
+	Fields map[string]Validate
 	// Name of the searchable fields
 	Searchable map[string]struct{}
 }
 
 // Map of available formats
 var Formats map[string]Format
+
+// Signature of validation functions
+type Validate func(ctx context.Context, value interface{}) bool
 
 // FormatForTemplate returns the format whose name matches the ending of the template name, and a boolean indicating
 // if the format was found
@@ -69,7 +70,7 @@ func (f Format) Validate(ctx context.Context, record map[string]string) (failed 
 	for name, value := range record {
 		if name != "id" {
 			if validateFunc, found := f.Fields[name]; found {
-				if !validateFunc(ctx, value) {
+				if validateFunc != nil && !validateFunc(ctx, value) {
 					// Underscore value because empty string is empty pipeline in the template
 					failed["_"+name+"_fail"] = "_"
 				}
