@@ -3,13 +3,18 @@ package tests
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/ivanmartinez/boocat/database"
 	"github.com/ivanmartinez/boocat/formats"
+	"github.com/ivanmartinez/boocat/log"
 	"github.com/ivanmartinez/boocat/server"
 )
 
@@ -180,8 +185,8 @@ func TestAddRecord(t *testing.T) {
 
 func TestAddRecordValidationFail(t *testing.T) {
 	initialize()
-	req := httptest.NewRequest("POST", "/book", strings.NewReader("name=the wind-up bird chronicle&year=95&"+
-		"author=author1&synopsis=novel"))
+	req := httptest.NewRequest("POST", "/book", strings.NewReader("name=the wind-up bird chronicle&year=MCMXCV&"+
+		"author=author4&synopsis=novel"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	res := handle(req)
 	if res.StatusCode != 200 {
@@ -190,12 +195,13 @@ func TestAddRecordValidationFail(t *testing.T) {
 	// Check the response to the request
 	fields := decodeToMap(t, res.Body)
 	checkValues(t, fields, map[string]string{
-		"name":       "the wind-up bird chronicle",
-		"year":       "95",
-		"author":     "author1",
-		"synopsis":   "novel",
-		"_name_fail": "_",
-		"_year_fail": "_",
+		"name":         "the wind-up bird chronicle",
+		"year":         "MCMXCV",
+		"author":       "author4",
+		"synopsis":     "novel",
+		"_name_fail":   "_",
+		"_year_fail":   "_",
+		"_author_fail": "_",
 	})
 	// @TODO: Check that the record hasn't been added
 }
@@ -343,8 +349,66 @@ func handle(req *http.Request) *http.Response {
 }
 
 func initialize() {
-	formats.InitializeFields()
+	formats.Formats = make(map[string]formats.Format)
+	initializeFields(formats.Formats)
 	db := initializedDB()
-	formats.InitializeValidators()
+	initializeValidators(formats.Formats, db)
 	server.Initialize("", "web", db)
+}
+
+// initializeFields initializes the format fields
+func initializeFields(bcFormats map[string]formats.Format) {
+	bcFormats["author"] = formats.Format{
+		Name: "author",
+		Fields: map[string]formats.Validate{
+			"name":      nil,
+			"birthdate": nil,
+			"biography": nil,
+		},
+		Searchable: map[string]struct{}{"name": {}, "biography": {}},
+	}
+
+	bcFormats["book"] = formats.Format{
+		Name: "book",
+		Fields: map[string]formats.Validate{
+			"name":     nil,
+			"year":     nil,
+			"author":   nil,
+			"synopsis": nil,
+		},
+		Searchable: map[string]struct{}{"name": {}, "synopsis": {}},
+	}
+}
+
+func initializeValidators(bcFormats map[string]formats.Format, db database.DB) {
+	bcFormats["author"].Fields["name"] = regExpValidator("^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
+	bcFormats["author"].Fields["birthdate"] = validateYear
+
+	bcFormats["book"].Fields["name"] = regExpValidator("^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
+	bcFormats["book"].Fields["year"] = validateYear
+	bcFormats["book"].Fields["author"] = db.ReferenceValidator("author")
+}
+
+// reqExpValidator returns a validator that uses the regular expression passed as argument
+func regExpValidator(regExpString string) formats.Validate {
+	regExp, err := regexp.Compile(regExpString)
+	if err != nil {
+		log.Error.Fatal(err)
+	}
+	return func(_ context.Context, value interface{}) bool {
+		stringValue := fmt.Sprintf("%v", value)
+		return regExp.MatchString(stringValue)
+	}
+}
+
+func validateYear(_ context.Context, value interface{}) bool {
+	stringValue := fmt.Sprintf("%v", value)
+	year, err := strconv.Atoi(stringValue)
+	if err != nil {
+		return false
+	}
+	if year < 0 {
+		return false
+	}
+	return true
 }

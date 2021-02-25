@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/ivanmartinez/boocat/formats"
 )
 
 // MockDB is a database mock for testing
@@ -107,6 +109,15 @@ func (db *MockDB) SearchRecord(_ context.Context, formatName, search string) ([]
 		return slice, nil
 	}
 	return nil, errors.New("format not found")
+}
+
+// referenceValidator returns a validator for references to records of the passed format name
+func (db *MockDB) ReferenceValidator(formatName string) formats.Validate {
+	return func(ctx context.Context, value interface{}) bool {
+		stringValue := fmt.Sprintf("%v", value)
+		_, err := db.GetRecord(ctx, formatName, stringValue)
+		return err == nil
+	}
 }
 
 // LastID takes a format and returns the database ID of the last record of
