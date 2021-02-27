@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -19,11 +20,12 @@ const (
 
 // DB is the database interface
 type DB interface {
-	AddRecord(ctx context.Context, format string, record map[string]string) (string, error)
-	UpdateRecord(ctx context.Context, format string, record map[string]string) error
-	GetAllRecords(ctx context.Context, format string) ([]map[string]string, error)
-	GetRecord(ctx context.Context, format, id string) (map[string]string, error)
-	SearchRecord(ctx context.Context, format string, value string) ([]map[string]string, error)
+	AddRecord(ctx context.Context, formatName string, record map[string]string) (string, error)
+	UpdateRecord(ctx context.Context, formatName string, record map[string]string) error
+	GetAllRecords(ctx context.Context, formatName string) ([]map[string]string, error)
+	GetRecord(ctx context.Context, formatName, id string) (map[string]string, error)
+	SearchRecord(ctx context.Context, formatName, value string) ([]map[string]string, error)
+	ReferenceValidator(formatName string) formats.Validate
 }
 
 // mongoDB database
@@ -93,8 +95,8 @@ func (db *mongoDB) Disconnect(ctx context.Context) {
 }
 
 // AddRecord adds a new record (author, book...)
-func (db *mongoDB) AddRecord(ctx context.Context, format string, record map[string]string) (string, error) {
-	if col, found := db.collections[format]; found {
+func (db *mongoDB) AddRecord(ctx context.Context, formatName string, record map[string]string) (string, error) {
+	if col, found := db.collections[formatName]; found {
 		if _, found := record["id"]; found {
 			return "", errors.New("new record cannot have id")
 		}
@@ -108,8 +110,8 @@ func (db *mongoDB) AddRecord(ctx context.Context, format string, record map[stri
 }
 
 // UpdateRecord updates a record (author, book...)
-func (db *mongoDB) UpdateRecord(ctx context.Context, format string, record map[string]string) error {
-	if col, found := db.collections[format]; found {
+func (db *mongoDB) UpdateRecord(ctx context.Context, formatName string, record map[string]string) error {
+	if col, found := db.collections[formatName]; found {
 		if id, fields := splitID(record); id != "" {
 			// Get ObjectID as used by MongoDB
 			objectID, _ := primitive.ObjectIDFromHex(id)
@@ -123,8 +125,8 @@ func (db *mongoDB) UpdateRecord(ctx context.Context, format string, record map[s
 }
 
 // GetRecord returns a record from the database by the id field
-func (db *mongoDB) GetRecord(ctx context.Context, format, id string) (map[string]string, error) {
-	if col, found := db.collections[format]; found {
+func (db *mongoDB) GetRecord(ctx context.Context, formatName, id string) (map[string]string, error) {
+	if col, found := db.collections[formatName]; found {
 		// Get ObjectID as used by MongoDB
 		objectID, _ := primitive.ObjectIDFromHex(id)
 		var document map[string]string
@@ -138,8 +140,8 @@ func (db *mongoDB) GetRecord(ctx context.Context, format, id string) (map[string
 }
 
 // GetAllRecords returns all records of a specific format from the database
-func (db *mongoDB) GetAllRecords(ctx context.Context, format string) ([]map[string]string, error) {
-	if col, found := db.collections[format]; found {
+func (db *mongoDB) GetAllRecords(ctx context.Context, formatName string) ([]map[string]string, error) {
+	if col, found := db.collections[formatName]; found {
 		cursor, err := col.Find(context.TODO(), bson.M{})
 		if err != nil {
 			return nil, err
@@ -154,8 +156,8 @@ func (db *mongoDB) GetAllRecords(ctx context.Context, format string) ([]map[stri
 }
 
 // SearchRecord returns all records of a specific format from the database that matches the search term
-func (db *mongoDB) SearchRecord(ctx context.Context, format string, search string) ([]map[string]string, error) {
-	if col, found := db.collections[format]; found {
+func (db *mongoDB) SearchRecord(ctx context.Context, formatName, search string) ([]map[string]string, error) {
+	if col, found := db.collections[formatName]; found {
 		// { $text: { $search: "Coffee", $caseSensitive: true } }
 		cursor, err := col.Find(ctx, bson.M{"$text": bson.M{"$search": search}})
 		if err != nil {
@@ -168,6 +170,15 @@ func (db *mongoDB) SearchRecord(ctx context.Context, format string, search strin
 		return documentsToRecords(documents), nil
 	}
 	return nil, errors.New("format not found")
+}
+
+// referenceValidator returns a validator for references to records of the passed format name
+func (db *mongoDB) ReferenceValidator(formatName string) formats.Validate {
+	return func(ctx context.Context, value interface{}) bool {
+		stringValue := fmt.Sprintf("%v", value)
+		_, err := db.GetRecord(ctx, formatName, stringValue)
+		return err == nil
+	}
 }
 
 // findTextIndex looks for a text index in the passed indexes and returns it if found
