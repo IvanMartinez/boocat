@@ -23,7 +23,7 @@ type DB interface {
 	AddRecord(ctx context.Context, formatName string, record map[string]string) (string, error)
 	UpdateRecord(ctx context.Context, formatName string, record map[string]string) error
 	GetAllRecords(ctx context.Context, formatName string) ([]map[string]string, error)
-	GetRecord(ctx context.Context, format, id string) (map[string]string, error)
+	GetRecord(ctx context.Context, formatName, id string) (map[string]string, error)
 	SearchRecord(ctx context.Context, formatName, value string) ([]map[string]string, error)
 	ReferenceValidator(formatName string) formats.Validate
 }
@@ -176,8 +176,8 @@ func (db *mongoDB) SearchRecord(ctx context.Context, formatName, search string) 
 func (db *mongoDB) ReferenceValidator(formatName string) formats.Validate {
 	return func(ctx context.Context, value interface{}) bool {
 		stringValue := fmt.Sprintf("%v", value)
-		_, error := db.GetRecord(ctx, formatName, stringValue)
-		return error == nil
+		_, err := db.GetRecord(ctx, formatName, stringValue)
+		return err == nil
 	}
 }
 

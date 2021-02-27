@@ -356,7 +356,7 @@ func initialize() {
 	server.Initialize("", "web", db)
 }
 
-// initializeFields initializes the format fields
+// initializeFields initializes the formats and fields
 func initializeFields(bcFormats map[string]formats.Format) {
 	bcFormats["author"] = formats.Format{
 		Name: "author",
@@ -380,6 +380,7 @@ func initializeFields(bcFormats map[string]formats.Format) {
 	}
 }
 
+// initializeValidators initializes the validators of the values of the fields
 func initializeValidators(bcFormats map[string]formats.Format, db database.DB) {
 	bcFormats["author"].Fields["name"] = regExpValidator("^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
 	bcFormats["author"].Fields["birthdate"] = validateYear
@@ -401,6 +402,7 @@ func regExpValidator(regExpString string) formats.Validate {
 	}
 }
 
+// validateYear returns a validator that validates a year
 func validateYear(_ context.Context, value interface{}) bool {
 	stringValue := fmt.Sprintf("%v", value)
 	year, err := strconv.Atoi(stringValue)
