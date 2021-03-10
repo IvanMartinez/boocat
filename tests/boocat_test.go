@@ -12,10 +12,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ivanmartinez/boocat/database"
-	"github.com/ivanmartinez/boocat/formats"
 	"github.com/ivanmartinez/boocat/log"
 	"github.com/ivanmartinez/boocat/server"
+	"github.com/ivanmartinez/boocat/server/database"
+	"github.com/ivanmartinez/boocat/server/formats"
+	"github.com/ivanmartinez/boocat/web"
 )
 
 // initializedDB returns a MockDB with data for testing
@@ -344,7 +345,7 @@ func checkValues(t *testing.T, templateData map[string]string, checks map[string
 
 func handle(req *http.Request) *http.Response {
 	w := httptest.NewRecorder()
-	server.Handle(w, req)
+	web.Handle(w, req)
 	return w.Result()
 }
 
@@ -353,7 +354,9 @@ func initialize() {
 	initializeFields(formats.Formats)
 	db := initializedDB()
 	initializeValidators(formats.Formats, db)
-	server.Initialize("", "web", db)
+	server.Initialize(db)
+	web.Initialize("")
+	loadWebFiles()
 }
 
 // initializeFields initializes the formats and fields
@@ -413,4 +416,12 @@ func validateYear(_ context.Context, value interface{}) bool {
 		return false
 	}
 	return true
+}
+
+func loadWebFiles() {
+	web.LoadStaticFile("web", "/hello.html")
+	web.LoadTemplate("web", "/author.tmpl", "author")
+	web.LoadTemplate("web", "/book.tmpl", "book")
+	web.LoadTemplate("web", "/list/author.tmpl", "author")
+	web.LoadTemplate("web", "/list/book.tmpl", "book")
 }

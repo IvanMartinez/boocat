@@ -10,8 +10,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"github.com/ivanmartinez/boocat/formats"
 	"github.com/ivanmartinez/boocat/log"
+	"github.com/ivanmartinez/boocat/server/formats"
 )
 
 const (

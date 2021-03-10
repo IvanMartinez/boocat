@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ivanmartinez/boocat/formats"
+	"github.com/ivanmartinez/boocat/server/formats"
 )
 
 // MockDB is a database mock for testing

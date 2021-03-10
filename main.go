@@ -10,10 +10,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ivanmartinez/boocat/database"
-	"github.com/ivanmartinez/boocat/formats"
 	"github.com/ivanmartinez/boocat/log"
 	"github.com/ivanmartinez/boocat/server"
+	"github.com/ivanmartinez/boocat/server/database"
+	"github.com/ivanmartinez/boocat/server/formats"
+	"github.com/ivanmartinez/boocat/web"
 )
 
 func main() {
@@ -38,8 +39,10 @@ func main() {
 	initializeFields(formats.Formats)
 	db := database.Initialize(ctx, dbURI, formats.Formats)
 	initializeValidators(formats.Formats, db)
-	server.Initialize(*url, "bcweb", db)
-	server.Start()
+	server.Initialize(db)
+	web.Initialize(*url)
+	loadWebFiles()
+	web.Start()
 
 	// Wait for ctx to be cancelled
 	<-ctx.Done()
@@ -49,7 +52,7 @@ func main() {
 		5*time.Second)
 
 	// Shut services down
-	server.ShutdownServer(ctxShutDown)
+	web.Shutdown(ctxShutDown)
 	db.Disconnect(ctxShutDown)
 }
 
@@ -110,4 +113,18 @@ func validateYear(_ context.Context, value interface{}) bool {
 		return false
 	}
 	return true
+}
+
+func loadWebFiles() {
+	web.LoadStaticFile("bcweb", "/index.html")
+	web.LoadTemplate("bcweb", "/author.tmpl", "author")
+	web.LoadTemplate("bcweb", "/book.tmpl", "book")
+	web.LoadTemplate("bcweb", "/edit/author.tmpl", "author")
+	web.LoadTemplate("bcweb", "/edit/book.tmpl", "book")
+	web.LoadTemplate("bcweb", "/edit/nauthor.tmpl", "author")
+	web.LoadTemplate("bcweb", "/edit/nbook.tmpl", "book")
+	web.LoadTemplate("bcweb", "/list/author.tmpl", "author")
+	web.LoadTemplate("bcweb", "/list/book.tmpl", "book")
+	web.LoadTemplate("bcweb", "/search/author.tmpl", "author")
+	web.LoadTemplate("bcweb", "/search/book.tmpl", "book")
 }
