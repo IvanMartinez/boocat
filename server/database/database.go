@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -11,7 +10,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/ivanmartinez/boocat/log"
-	"github.com/ivanmartinez/boocat/server/formats"
+	bcerrors "github.com/ivanmartinez/boocat/server/errors"
+	"github.com/ivanmartinez/boocat/server/fomats"
 )
 
 const (
@@ -25,7 +25,7 @@ type DB interface {
 	GetAllRecords(ctx context.Context, formatName string) ([]map[string]string, error)
 	GetRecord(ctx context.Context, formatName, id string) (map[string]string, error)
 	SearchRecord(ctx context.Context, formatName, value string) ([]map[string]string, error)
-	ReferenceValidator(formatName string) formats.Validate
+	ReferenceValidator(formatName string) fomats.Validate
 }
 
 // mongoDB database
@@ -45,7 +45,7 @@ type textIndex struct {
 
 // Initialize connects to the database and initializes the collections
 // @TODO: Maybe the initialization of collections should be separated
-func Initialize(ctx context.Context, dbURI *string, formats map[string]formats.Format) *mongoDB {
+func Initialize(ctx context.Context, dbURI *string, formats map[string]fomats.Format) *mongoDB {
 
 	// Create and connect the client
 	cli, err := mongo.NewClient(options.Client().ApplyURI(*dbURI))
@@ -96,84 +96,95 @@ func (db *mongoDB) Disconnect(ctx context.Context) {
 
 // AddRecord adds a new record (author, book...)
 func (db *mongoDB) AddRecord(ctx context.Context, formatName string, record map[string]string) (string, error) {
-	if col, found := db.collections[formatName]; found {
-		if _, found := record["id"]; found {
-			return "", errors.New("new record cannot have id")
-		}
-		if res, err := col.InsertOne(ctx, record); err == nil {
-			return res.InsertedID.(primitive.ObjectID).Hex(), err
-		} else {
-			return "", err
-		}
+	col, found := db.collections[formatName]
+	if !found {
+		return "", bcerrors.NewFormatNotFoundError(formatName)
 	}
-	return "", errors.New("format not found")
+	if _, found := record["id"]; found {
+		return "", bcerrors.NewRecordHasIDError()
+	}
+	res, err := col.InsertOne(ctx, record)
+	if err != nil {
+		return "", err
+	}
+	return res.InsertedID.(primitive.ObjectID).Hex(), err
 }
 
 // UpdateRecord updates a record (author, book...)
 func (db *mongoDB) UpdateRecord(ctx context.Context, formatName string, record map[string]string) error {
-	if col, found := db.collections[formatName]; found {
-		if id, fields := splitID(record); id != "" {
-			// Get ObjectID as used by MongoDB
-			objectID, _ := primitive.ObjectIDFromHex(id)
-			_, err := col.ReplaceOne(ctx, bson.M{"_id": objectID},
-				fields)
-			return err
-		}
-		return errors.New("record doesn't have id")
+	col, found := db.collections[formatName]
+	if !found {
+		return bcerrors.NewFormatNotFoundError(formatName)
 	}
-	return errors.New("format not found")
+	id, fields := splitID(record)
+	if id == "" {
+		return bcerrors.NewRecordDoesntHaveIDError()
+	}
+	// Get ObjectID as used by MongoDB
+	objectID, _ := primitive.ObjectIDFromHex(id)
+	result, err := col.ReplaceOne(ctx, bson.M{"_id": objectID},
+		fields)
+	if result.MatchedCount != 0 {
+		return bcerrors.NewRecordNotFoundError(formatName, id)
+	}
+	return err
 }
 
 // GetRecord returns a record from the database by the id field
 func (db *mongoDB) GetRecord(ctx context.Context, formatName, id string) (map[string]string, error) {
-	if col, found := db.collections[formatName]; found {
-		// Get ObjectID as used by MongoDB
-		objectID, _ := primitive.ObjectIDFromHex(id)
-		var document map[string]string
-		err := col.FindOne(ctx, bson.M{"_id": objectID}).Decode(&document)
-		if err != nil {
-			return nil, err
-		}
-		return documentToRecord(document), nil
+	col, found := db.collections[formatName]
+	if !found {
+		return nil, bcerrors.NewFormatNotFoundError(formatName)
 	}
-	return nil, errors.New("format not found")
+	// Get ObjectID as used by MongoDB
+	objectID, _ := primitive.ObjectIDFromHex(id)
+	var document map[string]string
+	err := col.FindOne(ctx, bson.M{"_id": objectID}).Decode(&document)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, bcerrors.NewRecordNotFoundError(formatName, id)
+		}
+		return nil, err
+	}
+	return documentToRecord(document), nil
 }
 
 // GetAllRecords returns all records of a specific format from the database
 func (db *mongoDB) GetAllRecords(ctx context.Context, formatName string) ([]map[string]string, error) {
-	if col, found := db.collections[formatName]; found {
-		cursor, err := col.Find(context.TODO(), bson.M{})
-		if err != nil {
-			return nil, err
-		}
-		var documents []map[string]string
-		if err = cursor.All(ctx, &documents); err != nil {
-			return nil, err
-		}
-		return documentsToRecords(documents), nil
+	col, found := db.collections[formatName]
+	if !found {
+		return nil, bcerrors.NewFormatNotFoundError(formatName)
 	}
-	return nil, errors.New("format not found")
+	cursor, err := col.Find(context.TODO(), bson.M{})
+	if err != nil {
+		return nil, err
+	}
+	var documents []map[string]string
+	if err = cursor.All(ctx, &documents); err != nil {
+		return nil, err
+	}
+	return documentsToRecords(documents), nil
 }
 
 // SearchRecord returns all records of a specific format from the database that matches the search term
 func (db *mongoDB) SearchRecord(ctx context.Context, formatName, search string) ([]map[string]string, error) {
-	if col, found := db.collections[formatName]; found {
-		// { $text: { $search: "Coffee", $caseSensitive: true } }
-		cursor, err := col.Find(ctx, bson.M{"$text": bson.M{"$search": search}})
-		if err != nil {
-			return nil, err
-		}
-		var documents []map[string]string
-		if err = cursor.All(context.TODO(), &documents); err != nil {
-			return nil, err
-		}
-		return documentsToRecords(documents), nil
+	col, found := db.collections[formatName]
+	if !found {
+		return nil, bcerrors.NewFormatNotFoundError(formatName)
 	}
-	return nil, errors.New("format not found")
+	cursor, err := col.Find(ctx, bson.M{"$text": bson.M{"$search": search}})
+	if err != nil {
+		return nil, err
+	}
+	var documents []map[string]string
+	if err = cursor.All(context.TODO(), &documents); err != nil {
+		return nil, err
+	}
+	return documentsToRecords(documents), nil
 }
 
 // referenceValidator returns a validator for references to records of the passed format name
-func (db *mongoDB) ReferenceValidator(formatName string) formats.Validate {
+func (db *mongoDB) ReferenceValidator(formatName string) fomats.Validate {
 	return func(ctx context.Context, value interface{}) bool {
 		stringValue := fmt.Sprintf("%v", value)
 		_, err := db.GetRecord(ctx, formatName, stringValue)
@@ -223,7 +234,7 @@ func findTextIndex(ctx context.Context, indexes mongo.IndexView) (textIndex, boo
 }
 
 // textIndexModel returns the model to create a text index that matches the searchable fields of the format
-func textIndexModel(format formats.Format) mongo.IndexModel {
+func textIndexModel(format fomats.Format) mongo.IndexModel {
 	keys := make(bson.D, 0, len(format.Searchable))
 	for field := range format.Searchable {
 		keys = append(keys, primitive.E{Key: field, Value: "text"})

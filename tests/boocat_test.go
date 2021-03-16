@@ -15,7 +15,7 @@ import (
 	"github.com/ivanmartinez/boocat/log"
 	"github.com/ivanmartinez/boocat/server"
 	"github.com/ivanmartinez/boocat/server/database"
-	"github.com/ivanmartinez/boocat/server/formats"
+	"github.com/ivanmartinez/boocat/server/fomats"
 	"github.com/ivanmartinez/boocat/web"
 )
 
@@ -350,20 +350,20 @@ func handle(req *http.Request) *http.Response {
 }
 
 func initialize() {
-	formats.Formats = make(map[string]formats.Format)
-	initializeFields(formats.Formats)
+	fomats.Formats = make(map[string]fomats.Format)
+	initializeFields(fomats.Formats)
 	db := initializedDB()
-	initializeValidators(formats.Formats, db)
+	initializeValidators(fomats.Formats, db)
 	server.Initialize(db)
 	web.Initialize("")
 	loadWebFiles()
 }
 
 // initializeFields initializes the formats and fields
-func initializeFields(bcFormats map[string]formats.Format) {
-	bcFormats["author"] = formats.Format{
+func initializeFields(bcFormats map[string]fomats.Format) {
+	bcFormats["author"] = fomats.Format{
 		Name: "author",
-		Fields: map[string]formats.Validate{
+		Fields: map[string]fomats.Validate{
 			"name":      nil,
 			"birthdate": nil,
 			"biography": nil,
@@ -371,9 +371,9 @@ func initializeFields(bcFormats map[string]formats.Format) {
 		Searchable: map[string]struct{}{"name": {}, "biography": {}},
 	}
 
-	bcFormats["book"] = formats.Format{
+	bcFormats["book"] = fomats.Format{
 		Name: "book",
-		Fields: map[string]formats.Validate{
+		Fields: map[string]fomats.Validate{
 			"name":     nil,
 			"year":     nil,
 			"author":   nil,
@@ -384,7 +384,7 @@ func initializeFields(bcFormats map[string]formats.Format) {
 }
 
 // initializeValidators initializes the validators of the values of the fields
-func initializeValidators(bcFormats map[string]formats.Format, db database.DB) {
+func initializeValidators(bcFormats map[string]fomats.Format, db database.DB) {
 	bcFormats["author"].Fields["name"] = regExpValidator("^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
 	bcFormats["author"].Fields["birthdate"] = validateYear
 
@@ -394,7 +394,7 @@ func initializeValidators(bcFormats map[string]formats.Format, db database.DB) {
 }
 
 // reqExpValidator returns a validator that uses the regular expression passed as argument
-func regExpValidator(regExpString string) formats.Validate {
+func regExpValidator(regExpString string) fomats.Validate {
 	regExp, err := regexp.Compile(regExpString)
 	if err != nil {
 		log.Error.Fatal(err)

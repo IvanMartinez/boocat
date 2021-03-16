@@ -1,8 +1,7 @@
-package formats
+package fomats
 
 import (
 	"context"
-	"strings"
 )
 
 // Format definition
@@ -20,17 +19,6 @@ var Formats map[string]Format
 
 // Signature of validation functions
 type Validate func(ctx context.Context, value interface{}) bool
-
-// FormatForTemplate returns the format whose name matches the ending of the template name, and a boolean indicating
-// if the format was found
-func FormatForTemplate(templateName string) (Format, bool) {
-	for formatName, format := range Formats {
-		if strings.HasSuffix(templateName, formatName) {
-			return format, true
-		}
-	}
-	return Format{}, false
-}
 
 // IncompleteRecord tells if the record doesn't have all the fields of the format
 func (f Format) IncompleteRecord(record map[string]string) bool {
@@ -62,19 +50,17 @@ func (f Format) Merge(pRecord, sRecord map[string]string) (mRecord map[string]st
 	return mRecord
 }
 
-// Validate takes a record and returns a map with the fields that failed the validations of the format
-func (f Format) Validate(ctx context.Context, record map[string]string) (failed map[string]string) {
-	failed = make(map[string]string)
+// Validate takes a record and returns a slice with the fields that failed the validations of the format
+func (f Format) Validate(ctx context.Context, record map[string]string) []string {
+	failed := make([]string, 0, len(record))
 	for name, value := range record {
 		if name != "id" {
 			if validateFunc, found := f.Fields[name]; found {
 				if validateFunc != nil && !validateFunc(ctx, value) {
-					// Underscore value because empty string is empty pipeline in the template
-					failed["_"+name+"_fail"] = "_"
+					failed = append(failed, name)
 				}
 			} else {
-				// Underscore value because empty string is empty pipeline in the template
-				failed["_"+name+"_fail"] = "_"
+				failed = append(failed, name)
 			}
 		}
 	}

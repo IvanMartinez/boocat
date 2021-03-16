@@ -6,6 +6,7 @@ import (
 
 	"github.com/ivanmartinez/boocat/log"
 	"github.com/ivanmartinez/boocat/server"
+	bcerrors "github.com/ivanmartinez/boocat/server/errors"
 )
 
 var (
@@ -65,12 +66,19 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 
 func handleWithTemplate(w http.ResponseWriter, r *http.Request, template *Template) {
 	formValues := submittedFormValues(r)
-	var data interface{}
+	var (
+		status int
+		data   interface{}
+	)
 	if r.Method == "GET" {
-		data = handleGet(r.Context(), template.formatName, formValues)
+		status, data = handleGet(r.Context(), template.formatName, formValues)
 	} else {
 		// POST
-		data = handlePost(r.Context(), template.formatName, formValues)
+		status, data = handlePost(r.Context(), template.formatName, formValues)
+	}
+	if status != http.StatusOK {
+		http.Error(w, "", status)
+		return
 	}
 	err := template.Write(w, data)
 	if err != nil {
@@ -78,21 +86,62 @@ func handleWithTemplate(w http.ResponseWriter, r *http.Request, template *Templa
 	}
 }
 
-func handleGet(ctx context.Context, formatName string, params map[string]string) interface{} {
-	if _, found := params["id"]; found {
-		return server.GetRecord(ctx, formatName, params)
+func handleGet(ctx context.Context, formatName string, params map[string]string) (int, interface{}) {
+	if id, found := params["id"]; found {
+		return getRecord(ctx, formatName, id, params)
 	}
 	if search, found := params["_search"]; found {
-		return server.SearchRecords(ctx, formatName, search)
+		return searchRecords(ctx, formatName, search)
 	}
-	return server.ListRecords(ctx, formatName)
+	return listRecords(ctx, formatName)
 }
 
-func handlePost(ctx context.Context, formatName string, params map[string]string) interface{} {
+func handlePost(ctx context.Context, formatName string, params map[string]string) (int, interface{}) {
 	if _, found := params["id"]; found {
-		return server.UpdateRecord(ctx, formatName, params)
+		return updateRecord(ctx, formatName, params)
 	}
-	return server.AddRecord(ctx, formatName, params)
+	return addRecord(ctx, formatName, params)
+}
+
+func getRecord(ctx context.Context, formatName, id string, params map[string]string) (int, interface{}) {
+	record, err := server.GetRecord(ctx, formatName, id)
+	switch err {
+	case nil:
+		return http.StatusOK, record
+	case bcerrors.FormatNotFoundError{}:
+		return http.StatusNotFound, nil
+	case bcerrors.RecordNotFoundError{}:
+		return http.StatusNotFound, nil
+	default:
+		return http.StatusInternalServerError, nil
+	}
+}
+
+func listRecords(ctx context.Context, formatName string) (int, interface{}) {
+	records, err := server.ListRecords(ctx, formatName)
+	switch err {
+	case nil:
+		return http.StatusOK, records
+	case bcerrors.FormatNotFoundError{}:
+		return http.StatusNotFound, nil
+	default:
+		return http.StatusInternalServerError, nil
+	}
+}
+
+func searchRecords(ctx context.Context, formatName, search string) (int, interface{}) {
+	//return server.SearchRecords(ctx, formatName, params)
+	return http.StatusOK, nil
+}
+
+func addRecord(ctx context.Context, formatName string, params map[string]string) (int, interface{}) {
+	//return server.AddRecord(ctx, formatName, params)
+	return http.StatusOK, nil
+}
+
+func updateRecord(ctx context.Context, formatName string, params map[string]string) (int, interface{}) {
+	//return server.UpdateRecord(ctx, formatName, params)
+	return http.StatusOK, nil
 }
 
 // submittedFormValues returns a map with the values of the query parameters as well as the submitted form fields.
@@ -110,4 +159,15 @@ func submittedFormValues(r *http.Request) map[string]string {
 		values[field] = r.PostForm.Get(field)
 	}
 	return values
+}
+
+// add adds the elements of sMap to pMap and returns the result. Keys that exist in both maps are left as they are in
+// pMap
+func add(pMap, sMap map[string]string) (tMap map[string]string) {
+	for key, value := range sMap {
+		if _, found := pMap[key]; !found {
+			pMap[key] = value
+		}
+	}
+	return pMap
 }
