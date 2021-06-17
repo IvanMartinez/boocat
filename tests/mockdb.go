@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ivanmartinez/boocat/server/fomats"
+	"github.com/ivanmartinez/boocat/server/formats"
 )
 
 // MockDB is a database mock for testing
@@ -112,11 +112,14 @@ func (db *MockDB) SearchRecord(_ context.Context, formatName, search string) ([]
 }
 
 // referenceValidator returns a validator for references to records of the passed format name
-func (db *MockDB) ReferenceValidator(formatName string) fomats.Validate {
-	return func(ctx context.Context, value interface{}) bool {
+func (db *MockDB) ReferenceValidator(formatName string) formats.Validate {
+	return func(ctx context.Context, value interface{}) string {
 		stringValue := fmt.Sprintf("%v", value)
 		_, err := db.GetRecord(ctx, formatName, stringValue)
-		return err == nil
+		if err != nil {
+			return err.Error()
+		}
+		return ""
 	}
 }
 

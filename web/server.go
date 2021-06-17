@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/ivanmartinez/boocat/log"
@@ -47,7 +48,7 @@ func Shutdown(ctx context.Context) {
 // Handle handles a HTTP request.
 // The only reason why this function is public is to make it testable.
 func Handle(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" && r.Method != "POST" {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
 		http.Error(w, "", http.StatusBadRequest)
 	}
 	if template, found := GetTemplate(r.URL.Path); found {
@@ -105,12 +106,12 @@ func handlePost(ctx context.Context, formatName string, params map[string]string
 
 func getRecord(ctx context.Context, formatName, id string, params map[string]string) (int, interface{}) {
 	record, err := server.GetRecord(ctx, formatName, id)
-	switch err {
-	case nil:
+	switch {
+	case err == nil:
 		return http.StatusOK, record
-	case bcerrors.FormatNotFoundError{}:
+	case errors.Is(err, bcerrors.ErrFormatNotFound):
 		return http.StatusNotFound, nil
-	case bcerrors.RecordNotFoundError{}:
+	case errors.Is(err, bcerrors.ErrRecordNotFound):
 		return http.StatusNotFound, nil
 	default:
 		return http.StatusInternalServerError, nil
@@ -119,14 +120,13 @@ func getRecord(ctx context.Context, formatName, id string, params map[string]str
 
 func listRecords(ctx context.Context, formatName string) (int, interface{}) {
 	records, err := server.ListRecords(ctx, formatName)
-	switch err {
-	case nil:
-		return http.StatusOK, records
-	case bcerrors.FormatNotFoundError{}:
+	switch {
+	case errors.Is(err, bcerrors.ErrFormatNotFound):
 		return http.StatusNotFound, nil
-	default:
+	case err != nil:
 		return http.StatusInternalServerError, nil
 	}
+	return http.StatusOK, records
 }
 
 func searchRecords(ctx context.Context, formatName, search string) (int, interface{}) {
@@ -140,8 +140,15 @@ func addRecord(ctx context.Context, formatName string, params map[string]string)
 }
 
 func updateRecord(ctx context.Context, formatName string, params map[string]string) (int, interface{}) {
-	//return server.UpdateRecord(ctx, formatName, params)
-	return http.StatusOK, nil
+	err := server.UpdateRecord(ctx, formatName, params)
+	var validationError bcerrors.ValidationFailedError
+	switch {
+	case errors.As(err, &validationError):
+		addValidationFails(params, validationError)
+		return http.StatusOK, params
+	}
+	params["_success"] = "_"
+	return http.StatusOK, params
 }
 
 // submittedFormValues returns a map with the values of the query parameters as well as the submitted form fields.
@@ -170,4 +177,11 @@ func add(pMap, sMap map[string]string) (tMap map[string]string) {
 		}
 	}
 	return pMap
+}
+
+func addValidationFails(params map[string]string, validationError bcerrors.ValidationFailedError) map[string]string {
+	for field, err := range validationError.Failed {
+		params["_"+field+"_fail"] = err
+	}
+	return params
 }

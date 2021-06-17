@@ -1,7 +1,8 @@
-package fomats
+package formats
 
 import (
 	"context"
+	"fmt"
 )
 
 // Format definition
@@ -18,7 +19,7 @@ type Format struct {
 var Formats map[string]Format
 
 // Signature of validation functions
-type Validate func(ctx context.Context, value interface{}) bool
+type Validate func(ctx context.Context, value interface{}) string
 
 // IncompleteRecord tells if the record doesn't have all the fields of the format
 func (f Format) IncompleteRecord(record map[string]string) bool {
@@ -51,16 +52,18 @@ func (f Format) Merge(pRecord, sRecord map[string]string) (mRecord map[string]st
 }
 
 // Validate takes a record and returns a slice with the fields that failed the validations of the format
-func (f Format) Validate(ctx context.Context, record map[string]string) []string {
-	failed := make([]string, 0, len(record))
+func (f Format) Validate(ctx context.Context, record map[string]string) map[string]string {
+	failed := make(map[string]string, len(record))
 	for name, value := range record {
 		if name != "id" {
 			if validateFunc, found := f.Fields[name]; found {
-				if validateFunc != nil && !validateFunc(ctx, value) {
-					failed = append(failed, name)
+				if validateFunc != nil {
+					if fail := validateFunc(ctx, value); fail != "" {
+						failed[name] = fail
+					}
 				}
 			} else {
-				failed = append(failed, name)
+				failed[name] = fmt.Sprintf("not a field of format '%s'", f.Name)
 			}
 		}
 	}

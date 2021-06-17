@@ -2,9 +2,11 @@ package server
 
 import (
 	"context"
+	"errors"
 
 	"github.com/ivanmartinez/boocat/log"
 	"github.com/ivanmartinez/boocat/server/database"
+	bcerrors "github.com/ivanmartinez/boocat/server/errors"
 	"github.com/ivanmartinez/boocat/server/formats"
 )
 
@@ -16,70 +18,89 @@ func Initialize(database database.DB) {
 }
 
 // GetRecord returns a record of a format (author, book...)
-func GetRecord(ctx context.Context, formatName string, record map[string]string) map[string]string {
-	format := formats.Formats[formatName] // TODO: Check that the format exists
-	// If record contains all the fields (from previous template), don't query the database
-	record = fillFromDatabase(ctx, record, format)
-	return record
+func GetRecord(ctx context.Context, formatName string, id string) (map[string]string, error) {
+	record, err := db.GetRecord(ctx, formatName, id)
+	switch {
+	case err == nil:
+		return record, nil
+	case errors.Is(err, bcerrors.ErrFormatNotFound):
+		return nil, bcerrors.ErrFormatNotFound
+	case errors.Is(err, bcerrors.ErrRecordNotFound):
+		return nil, bcerrors.ErrRecordNotFound
+	default:
+		log.Error.Printf("getting record from database: %v\n", err)
+		return nil, bcerrors.InternalServerError{}
+	}
 }
 
 // ListRecords returns a slice of all records of a format (authors, books...)
-func ListRecords(ctx context.Context, formatName string) []map[string]string {
+func ListRecords(ctx context.Context, formatName string) ([]map[string]string, error) {
 	records, err := db.GetAllRecords(ctx, formatName)
-	if err != nil {
+	switch {
+	case err == nil:
+		return records, nil
+	case errors.Is(err, bcerrors.ErrFormatNotFound):
+		return nil, bcerrors.ErrFormatNotFound
+	default:
 		log.Error.Printf("getting records from database: %v\n", err)
-		return nil
+		return nil, bcerrors.InternalServerError{}
 	}
-	return records
 }
 
 // SearchRecords returns a slice of the records of a format (authors, books...) whose search fields contains the value
-func SearchRecords(ctx context.Context, formatName string, search string) []map[string]string {
+func SearchRecords(ctx context.Context, formatName string, search string) ([]map[string]string, error) {
 	records, err := db.SearchRecord(ctx, formatName, search)
-	if err != nil {
-		log.Error.Printf("searching records in database: %v\n", err)
-		return nil
+	switch {
+	case err == nil:
+		return records, nil
+	case errors.Is(err, bcerrors.ErrFormatNotFound):
+		return nil, bcerrors.ErrFormatNotFound
+	default:
+		log.Error.Printf("searching records from database: %v\n", err)
+		return nil, bcerrors.InternalServerError{}
 	}
-	return records
 }
 
 // AddRecord adds a record of a format (author, book...)
-func AddRecord(ctx context.Context, formatName string, record map[string]string) map[string]string {
+func AddRecord(ctx context.Context, formatName string, record map[string]string) (string, error) {
 	format := formats.Formats[formatName] // TODO: Check that the format exists
-	tplData := make(map[string]string)
 	failed := format.Validate(ctx, record)
-	tplData = add(tplData, failed)
-	if len(failed) == 0 {
-		id, err := db.AddRecord(ctx, format.Name, record)
-		if err != nil {
-			log.Error.Printf("adding record to database: %v\n", err)
-		} else {
-			tplData["id"] = id
-			// Underscore value because empty string is empty pipeline in the template
-			tplData["_success"] = "_"
-		}
+	if len(failed) > 0 {
+		return "", bcerrors.ValidationFailedError{Failed: failed}
 	}
-	tplData = add(tplData, record)
-	return tplData
+	id, err := db.AddRecord(ctx, format.Name, record)
+	switch {
+	case err == nil:
+		return id, nil
+	case errors.Is(err, bcerrors.ErrFormatNotFound):
+		return "", bcerrors.ErrFormatNotFound
+	case errors.Is(err, bcerrors.ErrRecordHasID):
+		return "", bcerrors.ErrRecordHasID
+	default:
+		log.Error.Printf("adding record to database: %v\n", err)
+		return "", bcerrors.InternalServerError{}
+	}
 }
 
 // UpdateRecord updates a record of a format (author, book...)
-func UpdateRecord(ctx context.Context, formatName string, record map[string]string) map[string]string {
+func UpdateRecord(ctx context.Context, formatName string, record map[string]string) error {
 	format := formats.Formats[formatName] // TODO: Check that the format exists
-	tplData := make(map[string]string)
 	failed := format.Validate(ctx, record)
-	tplData = add(tplData, failed)
-	if len(failed) == 0 {
-		record = fillFromDatabase(ctx, record, format)
-		if err := db.UpdateRecord(ctx, format.Name, record); err != nil {
-			log.Error.Printf("updating record in database: %v\n", err)
-		} else {
-			// Underscore value because empty string is empty pipeline in the template
-			tplData["_success"] = "_"
-		}
+	if len(failed) > 0 {
+		return bcerrors.ValidationFailedError{Failed: failed}
 	}
-	tplData = add(tplData, record)
-	return tplData
+	err := db.UpdateRecord(ctx, format.Name, record)
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, bcerrors.ErrFormatNotFound):
+		return bcerrors.ErrFormatNotFound
+	case errors.Is(err, bcerrors.ErrRecordDoesntHaveID):
+		return bcerrors.ErrRecordDoesntHaveID
+	default:
+		log.Error.Printf("adding record to database: %v\n", err)
+		return bcerrors.InternalServerError{}
+	}
 }
 
 // fillFromDatabase If record is missing any field of the format, then get it from the database and return the filled
@@ -93,15 +114,4 @@ func fillFromDatabase(ctx context.Context, record map[string]string, format form
 		}
 	}
 	return record
-}
-
-// add adds the elements of sMap to pMap and returns the result. Keys that exist in both maps are left as they are in
-// pMap
-func add(pMap, sMap map[string]string) (tMap map[string]string) {
-	for key, value := range sMap {
-		if _, found := pMap[key]; !found {
-			pMap[key] = value
-		}
-	}
-	return pMap
 }

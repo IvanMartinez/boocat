@@ -43,7 +43,7 @@ func LoadTemplate(rootPath, path, formatName string) {
 		}
 }
 
-// LoadTemplate loads a static file from a file located in rootPath+path. The path of the URL of the file will be path.
+// LoadStaticFile loads a static file from a file located in rootPath+path. The path of the URL of the file will be path.
 // ".htm" and ".html" extensions are removed from the URL path.
 func LoadStaticFile(rootPath, path string) {
 	ext := strings.TrimPrefix(filepath.Ext(path), ".")

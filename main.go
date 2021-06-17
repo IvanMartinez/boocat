@@ -13,7 +13,7 @@ import (
 	"github.com/ivanmartinez/boocat/log"
 	"github.com/ivanmartinez/boocat/server"
 	"github.com/ivanmartinez/boocat/server/database"
-	"github.com/ivanmartinez/boocat/server/fomats"
+	"github.com/ivanmartinez/boocat/server/formats"
 	"github.com/ivanmartinez/boocat/web"
 )
 
@@ -35,10 +35,10 @@ func main() {
 	}()
 
 	// Start services
-	fomats.Formats = make(map[string]fomats.Format)
-	initializeFields(fomats.Formats)
-	db := database.Initialize(ctx, dbURI, fomats.Formats)
-	initializeValidators(fomats.Formats, db)
+	formats.Formats = make(map[string]formats.Format)
+	initializeFields(formats.Formats)
+	db := database.Initialize(ctx, dbURI, formats.Formats)
+	initializeValidators(formats.Formats, db)
 	server.Initialize(db)
 	web.Initialize(*url)
 	loadWebFiles()
@@ -57,10 +57,10 @@ func main() {
 }
 
 // initializeFields initializes the formats and fields
-func initializeFields(bcFormats map[string]fomats.Format) {
-	bcFormats["author"] = fomats.Format{
+func initializeFields(bcFormats map[string]formats.Format) {
+	bcFormats["author"] = formats.Format{
 		Name: "author",
-		Fields: map[string]fomats.Validate{
+		Fields: map[string]formats.Validate{
 			"name":      nil,
 			"birthdate": nil,
 			"biography": nil,
@@ -68,9 +68,9 @@ func initializeFields(bcFormats map[string]fomats.Format) {
 		Searchable: map[string]struct{}{"name": {}, "biography": {}},
 	}
 
-	bcFormats["book"] = fomats.Format{
+	bcFormats["book"] = formats.Format{
 		Name: "book",
-		Fields: map[string]fomats.Validate{
+		Fields: map[string]formats.Validate{
 			"name":     nil,
 			"year":     nil,
 			"author":   nil,
@@ -81,7 +81,7 @@ func initializeFields(bcFormats map[string]fomats.Format) {
 }
 
 // initializeValidators initializes the validators of the values of the fields
-func initializeValidators(bcFormats map[string]fomats.Format, db database.DB) {
+func initializeValidators(bcFormats map[string]formats.Format, db database.DB) {
 	bcFormats["author"].Fields["name"] = regExpValidator("^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
 	bcFormats["author"].Fields["birthdate"] = validateYear
 
@@ -91,28 +91,31 @@ func initializeValidators(bcFormats map[string]fomats.Format, db database.DB) {
 }
 
 // reqExpValidator returns a validator that uses the regular expression passed as argument
-func regExpValidator(regExpString string) fomats.Validate {
+func regExpValidator(regExpString string) formats.Validate {
 	regExp, err := regexp.Compile(regExpString)
 	if err != nil {
 		log.Error.Fatal(err)
 	}
-	return func(_ context.Context, value interface{}) bool {
+	return func(_ context.Context, value interface{}) string {
 		stringValue := fmt.Sprintf("%v", value)
-		return regExp.MatchString(stringValue)
+		if !regExp.MatchString(stringValue) {
+			return fmt.Sprintf("does not match regular expression '%s'", regExpString)
+		}
+		return ""
 	}
 }
 
 // validateYear returns a validator that validates a year
-func validateYear(_ context.Context, value interface{}) bool {
+func validateYear(_ context.Context, value interface{}) string {
 	stringValue := fmt.Sprintf("%v", value)
 	year, err := strconv.Atoi(stringValue)
 	if err != nil {
-		return false
+		return "not a valid year number"
 	}
 	if year < 0 {
-		return false
+		return "not a valid year number"
 	}
-	return true
+	return ""
 }
 
 func loadWebFiles() {
