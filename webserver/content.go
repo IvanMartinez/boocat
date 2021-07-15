@@ -1,4 +1,4 @@
-package web
+package webserver
 
 import (
 	"html/template"
@@ -21,22 +21,14 @@ type StaticFile struct {
 	content []byte
 }
 
-// templates is the map of templates to generate HTML pages of the website
-// @TODO add sync.RWMutex for concurrent access
-var templates map[string]*Template
-
-// staticFiles is the map of static files of the website
-// @TODO add sync.RWMutex for concurrent access
-var staticFiles map[string]*StaticFile
-
 // LoadTemplate loads a template from a file located in rootPath+path, and associates it to the format with name
 // formatName. The path of the URL of the template will be path without the file extension.
-func LoadTemplate(rootPath, path, formatName string) {
+func (ws *Webserver) LoadTemplate(rootPath, path, formatName string) {
 	tmpl, err := template.ParseFiles(rootPath + path)
 	if err != nil {
 		log.Error.Fatal(err)
 	}
-	templates[strings.TrimSuffix(path, filepath.Ext(path))] =
+	ws.templates[strings.TrimSuffix(path, filepath.Ext(path))] =
 		&Template{
 			template:   tmpl,
 			formatName: formatName,
@@ -45,7 +37,7 @@ func LoadTemplate(rootPath, path, formatName string) {
 
 // LoadStaticFile loads a static file from a file located in rootPath+path. The path of the URL of the file will be path.
 // ".htm" and ".html" extensions are removed from the URL path.
-func LoadStaticFile(rootPath, path string) {
+func (ws *Webserver) LoadStaticFile(rootPath, path string) {
 	ext := strings.TrimPrefix(filepath.Ext(path), ".")
 
 	switch {
@@ -54,7 +46,7 @@ func LoadStaticFile(rootPath, path string) {
 		if err != nil {
 			log.Error.Fatal(err)
 		}
-		staticFiles[strings.TrimSuffix(path, filepath.Ext(path))] =
+		ws.staticFiles[strings.TrimSuffix(path, filepath.Ext(path))] =
 			&StaticFile{
 				content: content,
 			}
@@ -63,7 +55,7 @@ func LoadStaticFile(rootPath, path string) {
 		if err != nil {
 			log.Error.Fatal(err)
 		}
-		staticFiles[path] =
+		ws.staticFiles[path] =
 			&StaticFile{
 				content: content,
 			}
@@ -80,16 +72,4 @@ func (sFile *StaticFile) Write(w http.ResponseWriter) error {
 	//@TODO: MIME types
 	_, err := w.Write(sFile.content)
 	return err
-}
-
-// GetTemplate returns a template by its URL path
-func GetTemplate(path string) (*Template, bool) {
-	tmpl, found := templates[path]
-	return tmpl, found
-}
-
-// GetFile returns a static file by its URL path
-func GetFile(path string) (*StaticFile, bool) {
-	file, found := staticFiles[path]
-	return file, found
 }

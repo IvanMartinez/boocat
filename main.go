@@ -10,16 +10,15 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ivanmartinez/boocat/boocat"
+	"github.com/ivanmartinez/boocat/boocat/mongodb"
 	"github.com/ivanmartinez/boocat/log"
-	"github.com/ivanmartinez/boocat/server"
-	"github.com/ivanmartinez/boocat/server/database"
-	"github.com/ivanmartinez/boocat/server/formats"
-	"github.com/ivanmartinez/boocat/web"
+	"github.com/ivanmartinez/boocat/webserver"
 )
 
 func main() {
 	// Parse flags
-	url := flag.String("url", "localhost:80", "This server's base URL")
+	url := flag.String("url", "localhost:80", "This boocat's base URL")
 	dbURI := flag.String("dburi", "mongodb://127.0.0.1:27017", "Database URI")
 	flag.Parse()
 
@@ -34,64 +33,50 @@ func main() {
 		cancel()
 	}()
 
-	// Start services
-	formats.Formats = make(map[string]formats.Format)
-	initializeFields(formats.Formats)
-	db := database.Initialize(ctx, dbURI, formats.Formats)
-	initializeValidators(formats.Formats, db)
-	server.Initialize(db)
-	web.Initialize(*url)
-	loadWebFiles()
-	web.Start()
+	// Initialize database
+	db := mongodb.NewClient(ctx, dbURI)
+	// Set formats
+	var bc boocat.Boocat
+	bc.SetFormat("author", boocat.Format{
+		Name: "author",
+		Fields: map[string]boocat.Validate{
+			"name":      regExpValidator("^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$"),
+			"birthdate": validateYear,
+			"biography": nil,
+		},
+		Searchable: map[string]struct{}{"name": {}, "biography": {}},
+	})
+	bc.SetFormat("book", boocat.Format{
+		Name: "book",
+		Fields: map[string]boocat.Validate{
+			"name":     regExpValidator("^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$"),
+			"year":     validateYear,
+			"author":   db.ReferenceValidator("author"),
+			"synopsis": nil,
+		},
+		Searchable: map[string]struct{}{"name": {}, "synopsis": {}},
+	})
+	// Make sure database collections match the defined formats
+	db.InitializeCollections(ctx, bc.Formats())
+	// Set database to use
+	bc.SetDatabase(db)
+	ws := webserver.Initialize(*url, &bc)
+	loadWebFiles(&ws)
+	ws.Start()
 
 	// Wait for ctx to be cancelled
 	<-ctx.Done()
 
-	// New context with timeout to shut the HTTP server down
-	ctxShutDown, cancel := context.WithTimeout(context.Background(),
-		5*time.Second)
+	// New context with timeout to shut the HTTP boocat down
+	ctxShutDown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 
 	// Shut services down
-	web.Shutdown(ctxShutDown)
+	ws.Shutdown(ctxShutDown)
 	db.Disconnect(ctxShutDown)
 }
 
-// initializeFields initializes the formats and fields
-func initializeFields(bcFormats map[string]formats.Format) {
-	bcFormats["author"] = formats.Format{
-		Name: "author",
-		Fields: map[string]formats.Validate{
-			"name":      nil,
-			"birthdate": nil,
-			"biography": nil,
-		},
-		Searchable: map[string]struct{}{"name": {}, "biography": {}},
-	}
-
-	bcFormats["book"] = formats.Format{
-		Name: "book",
-		Fields: map[string]formats.Validate{
-			"name":     nil,
-			"year":     nil,
-			"author":   nil,
-			"synopsis": nil,
-		},
-		Searchable: map[string]struct{}{"name": {}, "synopsis": {}},
-	}
-}
-
-// initializeValidators initializes the validators of the values of the fields
-func initializeValidators(bcFormats map[string]formats.Format, db database.DB) {
-	bcFormats["author"].Fields["name"] = regExpValidator("^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
-	bcFormats["author"].Fields["birthdate"] = validateYear
-
-	bcFormats["book"].Fields["name"] = regExpValidator("^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
-	bcFormats["book"].Fields["year"] = validateYear
-	bcFormats["book"].Fields["author"] = db.ReferenceValidator("author")
-}
-
 // reqExpValidator returns a validator that uses the regular expression passed as argument
-func regExpValidator(regExpString string) formats.Validate {
+func regExpValidator(regExpString string) boocat.Validate {
 	regExp, err := regexp.Compile(regExpString)
 	if err != nil {
 		log.Error.Fatal(err)
@@ -118,16 +103,16 @@ func validateYear(_ context.Context, value interface{}) string {
 	return ""
 }
 
-func loadWebFiles() {
-	web.LoadStaticFile("bcweb", "/index.html")
-	web.LoadTemplate("bcweb", "/author.tmpl", "author")
-	web.LoadTemplate("bcweb", "/book.tmpl", "book")
-	web.LoadTemplate("bcweb", "/new/author.tmpl", "author")
-	web.LoadTemplate("bcweb", "/new/book.tmpl", "book")
-	web.LoadTemplate("bcweb", "/edit/author.tmpl", "author")
-	web.LoadTemplate("bcweb", "/edit/book.tmpl", "book")
-	web.LoadTemplate("bcweb", "/list/author.tmpl", "author")
-	web.LoadTemplate("bcweb", "/list/book.tmpl", "book")
-	web.LoadTemplate("bcweb", "/search/author.tmpl", "author")
-	web.LoadTemplate("bcweb", "/search/book.tmpl", "book")
+func loadWebFiles(ws *webserver.Webserver) {
+	ws.LoadStaticFile("bcweb", "/index.html")
+	ws.LoadTemplate("bcweb", "/author.tmpl", "author")
+	ws.LoadTemplate("bcweb", "/book.tmpl", "book")
+	ws.LoadTemplate("bcweb", "/new/author.tmpl", "author")
+	ws.LoadTemplate("bcweb", "/new/book.tmpl", "book")
+	ws.LoadTemplate("bcweb", "/edit/author.tmpl", "author")
+	ws.LoadTemplate("bcweb", "/edit/book.tmpl", "book")
+	ws.LoadTemplate("bcweb", "/list/author.tmpl", "author")
+	ws.LoadTemplate("bcweb", "/list/book.tmpl", "book")
+	ws.LoadTemplate("bcweb", "/search/author.tmpl", "author")
+	ws.LoadTemplate("bcweb", "/search/book.tmpl", "book")
 }

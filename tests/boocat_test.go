@@ -12,11 +12,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ivanmartinez/boocat/boocat"
+	"github.com/ivanmartinez/boocat/boocat/mongodb"
 	"github.com/ivanmartinez/boocat/log"
-	"github.com/ivanmartinez/boocat/server"
-	"github.com/ivanmartinez/boocat/server/database"
-	"github.com/ivanmartinez/boocat/server/formats"
-	"github.com/ivanmartinez/boocat/web"
+	"github.com/ivanmartinez/boocat/webserver"
 )
 
 // initializedDB returns a MockDB with data for testing
@@ -345,25 +344,25 @@ func checkValues(t *testing.T, templateData map[string]string, checks map[string
 
 func handle(req *http.Request) *http.Response {
 	w := httptest.NewRecorder()
-	web.Handle(w, req)
+	webserver.Handle(w, req)
 	return w.Result()
 }
 
 func initialize() {
-	formats.Formats = make(map[string]formats.Format)
-	initializeFields(formats.Formats)
+	boocat.Formats = make(map[string]boocat.Format)
+	initializeFields(boocat.Formats)
 	db := initializedDB()
-	initializeValidators(formats.Formats, db)
-	server.Initialize(db)
-	web.Initialize("")
+	initializeValidators(boocat.Formats, db)
+	boocat.Initialize(db)
+	webserver.Initialize("")
 	loadWebFiles()
 }
 
 // initializeFields initializes the formats and fields
-func initializeFields(bcFormats map[string]formats.Format) {
-	bcFormats["author"] = formats.Format{
+func initializeFields(bcFormats map[string]boocat.Format) {
+	bcFormats["author"] = boocat.Format{
 		Name: "author",
-		Fields: map[string]formats.Validate{
+		Fields: map[string]boocat.Validate{
 			"name":      nil,
 			"birthdate": nil,
 			"biography": nil,
@@ -371,9 +370,9 @@ func initializeFields(bcFormats map[string]formats.Format) {
 		Searchable: map[string]struct{}{"name": {}, "biography": {}},
 	}
 
-	bcFormats["book"] = formats.Format{
+	bcFormats["book"] = boocat.Format{
 		Name: "book",
-		Fields: map[string]formats.Validate{
+		Fields: map[string]boocat.Validate{
 			"name":     nil,
 			"year":     nil,
 			"author":   nil,
@@ -384,7 +383,7 @@ func initializeFields(bcFormats map[string]formats.Format) {
 }
 
 // initializeValidators initializes the validators of the values of the fields
-func initializeValidators(bcFormats map[string]formats.Format, db database.DB) {
+func initializeValidators(bcFormats map[string]boocat.Format, db mongodb.DB) {
 	bcFormats["author"].Fields["name"] = regExpValidator("^([A-Z][a-z]*)([ |-][A-Z][a-z]*)*$")
 	bcFormats["author"].Fields["birthdate"] = validateYear
 
@@ -394,7 +393,7 @@ func initializeValidators(bcFormats map[string]formats.Format, db database.DB) {
 }
 
 // reqExpValidator returns a validator that uses the regular expression passed as argument
-func regExpValidator(regExpString string) formats.Validate {
+func regExpValidator(regExpString string) boocat.Validate {
 	regExp, err := regexp.Compile(regExpString)
 	if err != nil {
 		log.Error.Fatal(err)
@@ -422,9 +421,9 @@ func validateYear(_ context.Context, value interface{}) string {
 }
 
 func loadWebFiles() {
-	web.LoadStaticFile("web", "/hello.html")
-	web.LoadTemplate("web", "/author.tmpl", "author")
-	web.LoadTemplate("web", "/book.tmpl", "book")
-	web.LoadTemplate("web", "/list/author.tmpl", "author")
-	web.LoadTemplate("web", "/list/book.tmpl", "book")
+	webserver.LoadStaticFile("web", "/hello.html")
+	webserver.LoadTemplate("web", "/author.tmpl", "author")
+	webserver.LoadTemplate("web", "/book.tmpl", "book")
+	webserver.LoadTemplate("web", "/list/author.tmpl", "author")
+	webserver.LoadTemplate("web", "/list/book.tmpl", "book")
 }
