@@ -1,6 +1,0 @@
-{{$first := true}}
-{
-{{- range $key, $value := .}}
-{{if $first}}{{$first = false}}{{else}},{{end}}"{{$key}}":"{{$value}}"
-{{- end}}
-}

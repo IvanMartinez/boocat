@@ -27,7 +27,7 @@ func Initialize(url string, bc *boocat.Boocat) Webserver {
 		bc: bc,
 	}
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", ws.Handle)
+	mux.HandleFunc("/", ws.handle)
 	ws.httpServer = &http.Server{
 		Addr:    url,
 		Handler: mux,
@@ -55,9 +55,9 @@ func (ws *Webserver) Shutdown(ctx context.Context) {
 	}
 }
 
-// Handle handles a HTTP request.
+// handle handles a HTTP request.
 // The only reason why this function is public is to make it testable.
-func (ws *Webserver) Handle(w http.ResponseWriter, r *http.Request) {
+func (ws *Webserver) handle(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodPost {
 		http.Error(w, "", http.StatusBadRequest)
 	}
