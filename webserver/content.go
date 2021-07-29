@@ -1,5 +1,7 @@
 package webserver
 
+// This manages the website content, static files and templates
+
 import (
 	"html/template"
 	"io/ioutil"
@@ -16,7 +18,7 @@ type Template struct {
 	formatName string
 }
 
-// StaticFile contains the contents of a static file
+// StaticFile contains a static file
 type StaticFile struct {
 	content []byte
 }

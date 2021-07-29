@@ -1,5 +1,7 @@
 package mongodb
 
+// MongoDB implementation of the database
+
 import (
 	"context"
 	"fmt"
@@ -18,7 +20,7 @@ const (
 	dbName = "boocat"
 )
 
-// mongoDB database
+// mongoDB is the client side definition of a MongoDB database
 type mongoDB struct {
 	// MongoDB client
 	client *mongo.Client
@@ -33,7 +35,8 @@ type textIndex struct {
 	fields map[string]struct{}
 }
 
-func NewClient(ctx context.Context, dbURI *string) *mongoDB {
+// NewMongoDB a client connected to a MongoDB database
+func NewMongoDB(ctx context.Context, dbURI *string) *mongoDB {
 	// Create and connect the client
 	cli, err := mongo.NewClient(options.Client().ApplyURI(*dbURI))
 	if err != nil {
@@ -48,8 +51,8 @@ func NewClient(ctx context.Context, dbURI *string) *mongoDB {
 	}
 }
 
+// InitializeCollections initializes the collections and sets indexes accordingly to the formats
 func (db *mongoDB) InitializeCollections(ctx context.Context, formats map[string]boocat.Format) {
-	// Initialize the collections
 	db3 := db.client.Database(dbName)
 	collections := make(map[string]*mongo.Collection, len(formats))
 	for _, format := range formats {
@@ -57,7 +60,9 @@ func (db *mongoDB) InitializeCollections(ctx context.Context, formats map[string
 		collections[format.Name] = collection
 		indexes := collection.Indexes()
 		if index, ok := findTextIndex(ctx, indexes); ok {
+			// If the fields of the index don't match the searchable fields of the format
 			if !format.SearchableAre(index.fields) {
+				// Re-create the index with the format's searchable fields
 				if _, err := indexes.DropOne(ctx, index.name); err != nil {
 					log.Error.Fatal(err)
 				}
@@ -138,7 +143,7 @@ func (db *mongoDB) GetRecord(ctx context.Context, formatName, id string) (map[st
 	return documentToRecord(document), nil
 }
 
-// GetAllRecords returns all records of the format
+// GetAllRecords returns all records of a specific format from the database
 func (db *mongoDB) GetAllRecords(ctx context.Context, formatName string) ([]map[string]string, error) {
 	col, found := db.collections[formatName]
 	if !found {
@@ -172,7 +177,7 @@ func (db *mongoDB) SearchRecord(ctx context.Context, formatName, value string) (
 	return documentsToRecords(documents), nil
 }
 
-// referenceValidator returns a validator of references to records of the format
+// ReferenceValidator returns a validator of references to records of the format
 func (db *mongoDB) ReferenceValidator(formatName string) boocat.Validate {
 	return func(ctx context.Context, value interface{}) string {
 		stringValue := fmt.Sprintf("%v", value)
@@ -235,19 +240,21 @@ func textIndexModel(format boocat.Format) mongo.IndexModel {
 	}
 }
 
-func splitID(record map[string]string) (id string, recordNoID map[string]string) {
-	recordNoID = make(map[string]string)
+// splitID separates the id from the rest of the fields of the record
+func splitID(record map[string]string) (string, map[string]string) {
+	var id string
+	recordWithoutID := make(map[string]string, len(record))
 	for name, value := range record {
 		if name == "id" {
 			id = value
 		} else {
-			recordNoID[name] = value
+			recordWithoutID[name] = value
 		}
 	}
-	return id, recordNoID
+	return id, recordWithoutID
 }
 
-// Return map[string]string slice from MongoDB document slice. It just renames "_id" keys to "id".
+// Return a slice of records from a slice of MongoDB documents. It just renames "_id" keys to "id".
 func documentsToRecords(docs []map[string]string) []map[string]string {
 	records := make([]map[string]string, 0, len(docs))
 	for _, d := range docs {
@@ -256,7 +263,7 @@ func documentsToRecords(docs []map[string]string) []map[string]string {
 	return records
 }
 
-// Return map[string]string from MongoDB document. It just renames "_id" key to "id".
+// Returns a record from a MongoDB document. It just renames "_id" key to "id".
 func documentToRecord(doc map[string]string) map[string]string {
 	if id, found := doc["_id"]; found {
 		delete(doc, "_id")

@@ -1,5 +1,7 @@
 package errors
 
+// common errors
+
 import "errors"
 
 type InternalServerError struct{}

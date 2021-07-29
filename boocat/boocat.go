@@ -1,5 +1,8 @@
 package boocat
 
+// Implements the boocat API and logic
+// TODO Don't log errors, return them
+
 import (
 	"context"
 	"errors"
@@ -8,7 +11,7 @@ import (
 	"github.com/ivanmartinez/boocat/log"
 )
 
-// database is the database interface
+// database client interface
 type database interface {
 	AddRecord(ctx context.Context, formatName string, record map[string]string) (string, error)
 	UpdateRecord(ctx context.Context, formatName string, record map[string]string) error
@@ -18,16 +21,19 @@ type database interface {
 	ReferenceValidator(formatName string) Validate
 }
 
+// Boocat contains the data for the boocat API and logic
 type Boocat struct {
 	formats map[string]Format
 	db      database
 }
 
+// SetDatabase sets the database to be used
 func (bc *Boocat) SetDatabase(db database) *Boocat {
 	bc.db = db
 	return bc
 }
 
+// SetFormat sets a format to be used
 func (bc *Boocat) SetFormat(name string, format Format) *Boocat {
 	if bc.formats == nil {
 		bc.formats = make(map[string]Format)
@@ -36,13 +42,12 @@ func (bc *Boocat) SetFormat(name string, format Format) *Boocat {
 	return bc
 }
 
+// Formats returns all the defined formats
 func (bc *Boocat) Formats() map[string]Format {
 	return bc.formats
 }
 
-// TODO Don't log errors, return them
-
-// GetRecord returns a record of a format (author, book...)
+// GetRecord returns a record of a format by id
 func (bc *Boocat) GetRecord(ctx context.Context, formatName string, id string) (map[string]string, error) {
 	if bc.db == nil {
 		log.Error.Println("database not set")
@@ -62,7 +67,7 @@ func (bc *Boocat) GetRecord(ctx context.Context, formatName string, id string) (
 	}
 }
 
-// ListRecords returns a slice of all records of a format (authors, books...)
+// ListRecords returns a slice with all records of a format
 func (bc *Boocat) ListRecords(ctx context.Context, formatName string) ([]map[string]string, error) {
 	if bc.db == nil {
 		log.Error.Println("database not set")
@@ -80,7 +85,7 @@ func (bc *Boocat) ListRecords(ctx context.Context, formatName string) ([]map[str
 	}
 }
 
-// SearchRecords returns a slice of the records of a format (authors, books...) whose search fields contain the value
+// SearchRecords returns a slice of the records of a format whose searchable fields contain the search value
 func (bc *Boocat) SearchRecords(ctx context.Context, formatName string, search string) ([]map[string]string, error) {
 	if bc.db == nil {
 		log.Error.Println("database not set")
@@ -98,7 +103,7 @@ func (bc *Boocat) SearchRecords(ctx context.Context, formatName string, search s
 	}
 }
 
-// AddRecord adds a record of a format (author, book...)
+// AddRecord adds a record of a format
 func (bc *Boocat) AddRecord(ctx context.Context, formatName string, record map[string]string) (string, error) {
 	if bc.db == nil {
 		log.Error.Println("database not set")
@@ -122,7 +127,7 @@ func (bc *Boocat) AddRecord(ctx context.Context, formatName string, record map[s
 	return id, nil
 }
 
-// UpdateRecord updates a record of a format (author, book...)
+// UpdateRecord updates a record of a format
 func (bc *Boocat) UpdateRecord(ctx context.Context, formatName string, record map[string]string) error {
 	if bc.db == nil {
 		log.Error.Println("database not set")
@@ -145,20 +150,4 @@ func (bc *Boocat) UpdateRecord(ctx context.Context, formatName string, record ma
 		log.Error.Printf("adding record to database: %v\n", err)
 		return bcerrors.InternalServerError{}
 	}
-}
-
-// fillFromDatabase If record is missing any field of the format, then get it from the database and return the filled
-// record
-func (bc *Boocat) fillFromDatabase(ctx context.Context, record map[string]string, format Format) map[string]string {
-	if bc.db == nil {
-		log.Error.Println("database not set")
-	}
-	if format.IncompleteRecord(record) {
-		if dbRecord, err := bc.db.GetRecord(ctx, format.Name, record["id"]); err == nil {
-			record = format.Merge(record, dbRecord)
-		} else {
-			log.Error.Printf("getting record from database: %v\n", err)
-		}
-	}
-	return record
 }

@@ -34,7 +34,7 @@ func main() {
 	}()
 
 	// Initialize database
-	db := mongodb.NewClient(ctx, dbURI)
+	db := mongodb.NewMongoDB(ctx, dbURI)
 	// Set formats
 	var bc boocat.Boocat
 	bc.SetFormat("author", boocat.Format{

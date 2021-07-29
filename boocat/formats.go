@@ -1,5 +1,7 @@
 package boocat
 
+// Implements the definition of a format
+
 import (
 	"context"
 	"fmt"
@@ -11,44 +13,15 @@ type Format struct {
 	Name string
 	// Field names and validators
 	Fields map[string]Validate
-	// Name of the searchable fields
+	// Names of the searchable fields
 	Searchable map[string]struct{}
 }
 
-// Signature of validation functions
+// Signature of validation functions. If validation succeeds, they return the empty string. Otherwise they return a
+// human readable explanation of why it failed.
 type Validate func(ctx context.Context, value interface{}) string
 
-// IncompleteRecord tells if the record doesn't have all the fields of the format
-func (f Format) IncompleteRecord(record map[string]string) bool {
-	for name := range f.Fields {
-		if _, found := record[name]; !found {
-			return true
-		}
-	}
-	return false
-}
-
-// Merge returns a record with the fields and values of pRecord and sRecord that exist in the format plus id.
-// If a field exists in both records then the field and value is taken from pRecord.
-func (f Format) Merge(pRecord, sRecord map[string]string) (mRecord map[string]string) {
-	mRecord = make(map[string]string)
-	for name := range f.Fields {
-		if value, found := pRecord[name]; found {
-			mRecord[name] = value
-		} else if value, found := sRecord[name]; found {
-			mRecord[name] = value
-		}
-	}
-	// id is not in the format
-	if value, found := pRecord["id"]; found {
-		mRecord["id"] = value
-	} else if value, found := sRecord["id"]; found {
-		mRecord["id"] = value
-	}
-	return mRecord
-}
-
-// Validate takes a record and returns a slice with the fields that failed the validations of the format
+// Validate takes a record and returns a map with the result of the validation of every field
 func (f Format) Validate(ctx context.Context, record map[string]string) map[string]string {
 	failed := make(map[string]string, len(record))
 	for name, value := range record {

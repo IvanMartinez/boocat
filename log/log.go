@@ -1,5 +1,7 @@
 package log
 
+// Implements loggers
+
 import (
 	"log"
 	"os"

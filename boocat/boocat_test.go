@@ -29,7 +29,7 @@ func NewDB() (db *MockDB) {
 	}
 }
 
-// AddRecord adds a new record
+// AddRecord adds a new record of the format
 func (db *MockDB) AddRecord(_ context.Context, format string, record map[string]string) (string, error) {
 	if _, found := record["id"]; found {
 		return "", bcerrors.ErrRecordHasID
@@ -43,7 +43,7 @@ func (db *MockDB) AddRecord(_ context.Context, format string, record map[string]
 	return id, nil
 }
 
-// UpdateRecord updates a record
+// UpdateRecord updates a record of the format
 func (db *MockDB) UpdateRecord(_ context.Context, formatName string, record map[string]string) error {
 	if _, found := record["id"]; !found {
 		return bcerrors.ErrRecordDoesntHaveID
@@ -63,7 +63,7 @@ func (db *MockDB) UpdateRecord(_ context.Context, formatName string, record map[
 	return nil
 }
 
-// GetRecord returns a record from the database by the id field
+// GetRecord returns the record of the format with the id
 func (db *MockDB) GetRecord(_ context.Context, formatName, id string) (map[string]string, error) {
 	slice, found := db.records[formatName]
 	if !found {
@@ -89,7 +89,8 @@ func (db *MockDB) GetAllRecords(_ context.Context, formatName string) ([]map[str
 	return slice, nil
 }
 
-// SearchRecord returns all records the format that have the value in their searchable fields
+// SearchRecord returns all records the format that have the value in their searchable fields, which in this case are
+// all fields
 func (db *MockDB) SearchRecord(_ context.Context, formatName, value string) ([]map[string]string, error) {
 	slice, found := db.records[formatName]
 	if !found {
@@ -104,7 +105,7 @@ func (db *MockDB) SearchRecord(_ context.Context, formatName, value string) ([]m
 	return result, nil
 }
 
-// ReferenceValidator returns a validator for references to records of the passed format name
+// ReferenceValidator returns a validator of references to records of the format
 func (db *MockDB) ReferenceValidator(formatName string) Validate {
 	return func(ctx context.Context, value interface{}) string {
 		stringValue := fmt.Sprintf("%v", value)
@@ -126,6 +127,7 @@ func matchesSearch(record map[string]string, search string) bool {
 	return false
 }
 
+// TestGetRecord tests successfully getting a record with GetRecord
 func TestGetRecord(t *testing.T) {
 	db := initializedDatabase()
 	bc := initializedBoocat(db)
@@ -138,6 +140,7 @@ func TestGetRecord(t *testing.T) {
 	}
 }
 
+// TestListRecords tests successfully getting records with ListRecords
 func TestListRecords(t *testing.T) {
 	db := initializedDatabase()
 	bc := initializedBoocat(db)
@@ -150,6 +153,7 @@ func TestListRecords(t *testing.T) {
 	}
 }
 
+// TestSearchRecords tests successfully searching records with SearchRecords
 func TestSearchRecords(t *testing.T) {
 	db := initializedDatabase()
 	bc := initializedBoocat(db)
@@ -162,6 +166,7 @@ func TestSearchRecords(t *testing.T) {
 	}
 }
 
+// TestAddRecord tests successfully adding a record with AddRecord
 func TestAddRecord(t *testing.T) {
 	db := initializedDatabase()
 	bc := initializedBoocat(db)
@@ -194,6 +199,7 @@ func TestAddRecord(t *testing.T) {
 	}
 }
 
+// TestAddRecordValidationFail tests validation fails when attempting to add a record with AddRecord
 func TestAddRecordValidationFail(t *testing.T) {
 	db := initializedDatabase()
 	bc := initializedBoocat(db)
@@ -227,6 +233,7 @@ func TestAddRecordValidationFail(t *testing.T) {
 	}
 }
 
+// TestUpdateRecord tests successfully updating a record with UpdateRecord
 func TestUpdateRecord(t *testing.T) {
 	db := initializedDatabase()
 	bc := initializedBoocat(db)
@@ -253,6 +260,7 @@ func TestUpdateRecord(t *testing.T) {
 	}
 }
 
+// TestUpdateRecordValidationFail tests validation fails when attempting to update a record with UpdateRecord
 func TestUpdateRecordValidationFail(t *testing.T) {
 	db := initializedDatabase()
 	bc := initializedBoocat(db)
@@ -327,6 +335,7 @@ func initializedDatabase() (db *MockDB) {
 	return db
 }
 
+// initializedBoocat returns a boocat API and logic initialized with the database
 func initializedBoocat(db database) *Boocat {
 	var bc Boocat
 	bc.SetFormat("author", Format{
@@ -367,7 +376,7 @@ func regExpValidator(regExpString string) Validate {
 	}
 }
 
-// validateYear returns a validator that validates a year
+// validateYear is a validator that validates a year
 func validateYear(_ context.Context, value interface{}) string {
 	stringValue := fmt.Sprintf("%v", value)
 	year, err := strconv.Atoi(stringValue)

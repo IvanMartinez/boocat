@@ -1,5 +1,7 @@
 package webserver
 
+// Implements the web server
+
 import (
 	"context"
 	"errors"
@@ -21,7 +23,7 @@ type Webserver struct {
 	httpServer  *http.Server
 }
 
-// Initialize initializes the web server configuration without starting it. This is used in testing.
+// Initialize initializes the web server configuration without starting it
 func Initialize(url string, bc *boocat.Boocat) Webserver {
 	ws := Webserver{
 		bc: bc,
@@ -47,24 +49,25 @@ func (ws *Webserver) Start() {
 	}()
 }
 
-// Shutdown shuts the wes server down
+// Shutdown shuts the web server down
 func (ws *Webserver) Shutdown(ctx context.Context) {
-	// Shut the HTTP boocat down
+	// Shut the HTTP server down
 	if err := ws.httpServer.Shutdown(ctx); err != nil {
 		log.Error.Fatalf("boocat shutdown failed: %v", err)
 	}
 }
 
-// handle handles a HTTP request.
-// The only reason why this function is public is to make it testable.
+// handle handles a HTTP request
 func (ws *Webserver) handle(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodPost {
 		http.Error(w, "", http.StatusBadRequest)
 	}
+	// If there is a template for the path
 	if template, found := ws.templates[r.URL.Path]; found {
 		ws.handleWithTemplate(w, r, template)
 		return
 	}
+	// If there is a static file for the path
 	if file, found := ws.staticFiles[r.URL.Path]; found {
 		err := file.Write(w)
 		if err != nil {
@@ -75,6 +78,7 @@ func (ws *Webserver) handle(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 
+// handleWithTemplate handles a request using a template to generate the response
 func (ws *Webserver) handleWithTemplate(w http.ResponseWriter, r *http.Request, template *Template) {
 	formValues := submittedFormValues(r)
 	var (
@@ -98,16 +102,18 @@ func (ws *Webserver) handleWithTemplate(w http.ResponseWriter, r *http.Request, 
 	}
 }
 
+// handleGet handles a GET request
 func (ws *Webserver) handleGet(ctx context.Context, formatName string, params map[string]string) (int, interface{}) {
 	if id, found := params["id"]; found {
-		return ws.getRecord(ctx, formatName, id, params)
+		return ws.getRecord(ctx, formatName, id)
 	}
 	if search, found := params["_search"]; found {
-		return searchRecords(ctx, formatName, search)
+		return ws.searchRecords(ctx, formatName, search)
 	}
 	return ws.listRecords(ctx, formatName)
 }
 
+// handleGet handles a POST request
 func (ws *Webserver) handlePost(ctx context.Context, formatName string, params map[string]string) (int, interface{}) {
 	if _, found := params["id"]; found {
 		return ws.updateRecord(ctx, formatName, params)
@@ -115,7 +121,8 @@ func (ws *Webserver) handlePost(ctx context.Context, formatName string, params m
 	return ws.addRecord(ctx, formatName, params)
 }
 
-func (ws *Webserver) getRecord(ctx context.Context, formatName, id string, params map[string]string) (int, interface{}) {
+// getRecord handles a request to get a record
+func (ws *Webserver) getRecord(ctx context.Context, formatName, id string) (int, interface{}) {
 	record, err := ws.bc.GetRecord(ctx, formatName, id)
 	switch {
 	case errors.Is(err, bcerrors.ErrFormatNotFound):
@@ -128,6 +135,7 @@ func (ws *Webserver) getRecord(ctx context.Context, formatName, id string, param
 	return http.StatusOK, record
 }
 
+// listRecords handles a request to get several records
 func (ws *Webserver) listRecords(ctx context.Context, formatName string) (int, interface{}) {
 	records, err := ws.bc.ListRecords(ctx, formatName)
 	switch {
@@ -139,11 +147,19 @@ func (ws *Webserver) listRecords(ctx context.Context, formatName string) (int, i
 	return http.StatusOK, records
 }
 
-func searchRecords(ctx context.Context, formatName, search string) (int, interface{}) {
-	//return boocat.SearchRecords(ctx, formatName, params)
-	return http.StatusOK, nil
+// searchRecords handles a request to search for records
+func (ws *Webserver) searchRecords(ctx context.Context, formatName, search string) (int, interface{}) {
+	records, err := ws.bc.SearchRecords(ctx, formatName, search)
+	switch {
+	case errors.Is(err, bcerrors.ErrFormatNotFound):
+		return http.StatusNotFound, nil
+	case err != nil:
+		return http.StatusInternalServerError, nil
+	}
+	return http.StatusOK, records
 }
 
+// addRecord handles a request to add a record
 func (ws *Webserver) addRecord(ctx context.Context, formatName string, params map[string]string) (int, interface{}) {
 	_, err := ws.bc.AddRecord(ctx, formatName, params)
 	switch {
@@ -157,6 +173,7 @@ func (ws *Webserver) addRecord(ctx context.Context, formatName string, params ma
 	return http.StatusOK, nil
 }
 
+// updateRecord handles a request to update a record
 func (ws *Webserver) updateRecord(ctx context.Context, formatName string, params map[string]string) (int, interface{}) {
 	err := ws.bc.UpdateRecord(ctx, formatName, params)
 	var validationError bcerrors.ValidationFailedError
@@ -186,17 +203,7 @@ func submittedFormValues(r *http.Request) map[string]string {
 	return values
 }
 
-// add adds the elements of sMap to pMap and returns the result. Keys that exist in both maps are left as they are in
-// pMap
-func add(pMap, sMap map[string]string) (tMap map[string]string) {
-	for key, value := range sMap {
-		if _, found := pMap[key]; !found {
-			pMap[key] = value
-		}
-	}
-	return pMap
-}
-
+// addValidationFails returns params with the passed validation fails
 func addValidationFails(params map[string]string, validationError bcerrors.ValidationFailedError) map[string]string {
 	for field, err := range validationError.Failed {
 		params["_"+field+"_fail"] = err
