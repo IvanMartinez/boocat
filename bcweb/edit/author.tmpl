@@ -1,13 +1,15 @@
 <html>
 {{if and ._success .id}}
+<head>
 <meta http-equiv="refresh" content="0; URL=/author?id={{.id}}" />
+</head>
 {{- else}}
-
+<body>
 <h1>Editing author</h1>
 
 {{if .id}}
 <form action="/edit/author?id={{.id}}" method="POST">
-<input type="hidden" id="id" name="id" value="{{.id}}">
+<input type="hidden" id="id" name="id" value="{{.id}}"/>
 {{else}}
 <form action="/edit/author" method="POST">
 {{end}}
@@ -33,5 +35,6 @@ Biography: <input type="text" id="biography" name="biography" value="{{.biograph
 <input type="submit" value="Save"/>
 </div>
 </form>
+</body>
 {{- end}}
 </html>

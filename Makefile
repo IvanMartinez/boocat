@@ -6,12 +6,12 @@ debug:	### Debug Makefile itself
 
 .PHONY: build
 build:
-	go build -o boocat ./cmd/main.go
+	go build -o boocat ./main.go
 
 .PHONY: run
 run:
-	go run ./cmd/main.go -url="localhost:9090"
+	go run ./main.go -url="localhost:9090"
 
 .PHONY: test
 test:
-	go test -v ./tests
+	go test ./...

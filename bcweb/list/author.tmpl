@@ -1,7 +1,10 @@
 <html>
+<body>
 {{range .}}
-<div><A href="/author?id={{.id}}">{{.name}}</A></div>
+<div><a href="/author?id={{.id}}">{{.name}}</a></div>
 {{end}}
-<br>
-<div><A href="/edit/nauthor">New</A></div>
+<br/>
+<div><a href="/new/author">New</a></div>
+<div><a href="/search/author">Search</a></div>
+</body>
 </html>

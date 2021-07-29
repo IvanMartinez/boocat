@@ -1,15 +1,17 @@
 <html>
 {{if and ._success .id}}
+<head>
 <meta http-equiv="refresh" content="0; URL=/book?id={{.id}}" />
+</head>
 {{- else}}
-
+<body>
 <h1>Editing book</h1>
 
 {{if .id}}
-<form action="/edit/book?id={{.id}}" method="POST">
-<input type="hidden" id="id" name="id" value="{{.id}}">
+<form action="/edit/book?id={{.id}}" method="post">
+<input type="hidden" id="id" name="id" value="{{.id}}"/>
 {{else}}
-<form action="/edit/book" method="POST">
+<form action="/edit/book" method="post">
 {{end}}
 <div>
 Name: <input type="text" id="name" name="name" value="{{.name}}"/>
@@ -33,5 +35,6 @@ Synopsis: <input type="text" id="synopsis" name="synopsis" value="{{.synopsis}}"
 <input type="submit" value="Save"/>
 </div>
 </form>
+</body>
 {{- end}}
 </html>
