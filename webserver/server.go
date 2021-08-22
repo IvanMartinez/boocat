@@ -9,7 +9,6 @@ import (
 
 	"github.com/ivanmartinez/boocat/boocat"
 	bcerrors "github.com/ivanmartinez/boocat/boocat/errors"
-	"github.com/ivanmartinez/boocat/log"
 )
 
 type Webserver struct {
@@ -44,7 +43,7 @@ func (ws *Webserver) Start() {
 	// Start the web server in a new goroutine
 	go func() {
 		if err := ws.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Error.Fatalf("couldn't start HTTP boocat: %v", err)
+			Error.Fatalf("couldn't start HTTP boocat: %v", err)
 		}
 	}()
 }
@@ -53,7 +52,7 @@ func (ws *Webserver) Start() {
 func (ws *Webserver) Shutdown(ctx context.Context) {
 	// Shut the HTTP server down
 	if err := ws.httpServer.Shutdown(ctx); err != nil {
-		log.Error.Fatalf("boocat shutdown failed: %v", err)
+		Error.Fatalf("boocat shutdown failed: %v", err)
 	}
 }
 
@@ -97,7 +96,7 @@ func (ws *Webserver) handleWithTemplate(w http.ResponseWriter, r *http.Request, 
 	}
 	err := template.Write(w, data)
 	if err != nil {
-		log.Error.Printf("%v", err.Error())
+		Error.Printf("%v", err.Error())
 		http.Error(w, "", http.StatusInternalServerError)
 	}
 }

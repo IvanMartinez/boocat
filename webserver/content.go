@@ -8,8 +8,6 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
-
-	"github.com/ivanmartinez/boocat/log"
 )
 
 // Template contains a Template to generate output
@@ -28,7 +26,7 @@ type StaticFile struct {
 func (ws *Webserver) LoadTemplate(rootPath, path, formatName string) {
 	tmpl, err := template.ParseFiles(rootPath + path)
 	if err != nil {
-		log.Error.Fatal(err)
+		Error.Fatal(err)
 	}
 	ws.templates[strings.TrimSuffix(path, filepath.Ext(path))] =
 		&Template{
@@ -46,7 +44,7 @@ func (ws *Webserver) LoadStaticFile(rootPath, path string) {
 	case (ext == "htm") || (ext == "html"):
 		content, err := ioutil.ReadFile(rootPath + path)
 		if err != nil {
-			log.Error.Fatal(err)
+			Error.Fatal(err)
 		}
 		ws.staticFiles[strings.TrimSuffix(path, filepath.Ext(path))] =
 			&StaticFile{
@@ -55,7 +53,7 @@ func (ws *Webserver) LoadStaticFile(rootPath, path string) {
 	default:
 		content, err := ioutil.ReadFile(rootPath + path)
 		if err != nil {
-			log.Error.Fatal(err)
+			Error.Fatal(err)
 		}
 		ws.staticFiles[path] =
 			&StaticFile{

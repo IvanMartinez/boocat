@@ -13,7 +13,6 @@ import (
 
 	"github.com/ivanmartinez/boocat/boocat"
 	bcerrors "github.com/ivanmartinez/boocat/boocat/errors"
-	"github.com/ivanmartinez/boocat/log"
 )
 
 const (
@@ -36,56 +35,58 @@ type textIndex struct {
 }
 
 // NewMongoDB a client connected to a MongoDB database
-func NewMongoDB(ctx context.Context, dbURI *string) *mongoDB {
+func NewMongoDB(ctx context.Context, dbURI *string) (*mongoDB, error) {
 	// Create and connect the client
 	cli, err := mongo.NewClient(options.Client().ApplyURI(*dbURI))
 	if err != nil {
-		log.Error.Fatal(err)
+		return nil, fmt.Errorf("getting new client: %w", err)
 	}
 	if err = cli.Connect(ctx); err != nil {
-		log.Error.Fatal(err)
+		return nil, fmt.Errorf("connecting client: %w", err)
 	}
 
-	return &mongoDB{
-		client: cli,
-	}
+	return &mongoDB{client: cli}, nil
 }
 
 // InitializeCollections initializes the collections and sets indexes accordingly to the formats
-func (db *mongoDB) InitializeCollections(ctx context.Context, formats map[string]boocat.Format) {
+func (db *mongoDB) InitializeCollections(ctx context.Context, formats map[string]boocat.Format) error {
 	db3 := db.client.Database(dbName)
 	collections := make(map[string]*mongo.Collection, len(formats))
 	for _, format := range formats {
 		collection := db3.Collection(format.Name)
 		collections[format.Name] = collection
 		indexes := collection.Indexes()
-		if index, ok := findTextIndex(ctx, indexes); ok {
+		index, err := findTextIndex(ctx, indexes)
+		if err != nil {
+			return err
+		}
+		if index != nil {
 			// If the fields of the index don't match the searchable fields of the format
 			if !format.SearchableAre(index.fields) {
 				// Re-create the index with the format's searchable fields
 				if _, err := indexes.DropOne(ctx, index.name); err != nil {
-					log.Error.Fatal(err)
+					return fmt.Errorf("dropping existing index: %w", err)
 				}
 				indexModel := textIndexModel(format)
 				if _, err := indexes.CreateOne(ctx, indexModel); err != nil {
-					log.Error.Fatal(err)
+					return fmt.Errorf("creating new index: %w", err)
 				}
-				log.Info.Printf("Updated text index for %v", format.Name)
 			}
 		} else {
 			indexModel := textIndexModel(format)
 			if _, err := indexes.CreateOne(ctx, indexModel); err != nil {
-				log.Error.Fatal(err)
+				return fmt.Errorf("creating new index: %w", err)
 			}
-			log.Info.Printf("Created text index for %v", format.Name)
 		}
 	}
 	db.collections = collections
+
+	return nil
 }
 
 // Disconnect disconnects the database
-func (db *mongoDB) Disconnect(ctx context.Context) {
-	db.client.Disconnect(ctx)
+func (db *mongoDB) Disconnect(ctx context.Context) error {
+	return db.client.Disconnect(ctx)
 }
 
 // AddRecord adds a new record of the format
@@ -118,10 +119,13 @@ func (db *mongoDB) UpdateRecord(ctx context.Context, formatName string, record m
 	objectID, _ := primitive.ObjectIDFromHex(id)
 	result, err := col.ReplaceOne(ctx, bson.M{"_id": objectID},
 		fields)
+	if err != nil {
+		return err
+	}
 	if result.MatchedCount != 1 {
 		return bcerrors.ErrRecordNotFound
 	}
-	return err
+	return nil
 }
 
 // GetRecord returns the record of the format with the id
@@ -189,17 +193,17 @@ func (db *mongoDB) ReferenceValidator(formatName string) boocat.Validate {
 }
 
 // findTextIndex looks for a text index in the passed indexes and returns it if found
-func findTextIndex(ctx context.Context, indexes mongo.IndexView) (textIndex, bool) {
+func findTextIndex(ctx context.Context, indexes mongo.IndexView) (*textIndex, error) {
 	// Iterate through the collection's indexes
 	cursor, err := indexes.List(ctx)
 	if err != nil {
-		log.Error.Fatal(err)
+		return nil, fmt.Errorf("getting list of indexes: %w", err)
 	}
 	var result bson.M
 	for cursor.Next(ctx) {
 		err := cursor.Decode(&result)
 		if err != nil {
-			log.Error.Fatal(err)
+			return nil, fmt.Errorf("decoding index cursor: %w", err)
 		}
 		if keyValue, found := result["key"]; found {
 			if keyMap, ok := keyValue.(bson.M); ok {
@@ -219,14 +223,14 @@ func findTextIndex(ctx context.Context, indexes mongo.IndexView) (textIndex, boo
 							}
 						}
 						// Return the index data
-						return index, true
+						return &index, nil
 					}
 				}
 			}
 		}
 	}
 	// No text index found
-	return textIndex{}, false
+	return nil, nil
 }
 
 // textIndexModel returns the model to create a text index that matches the searchable fields of the format

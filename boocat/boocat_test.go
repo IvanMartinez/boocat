@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -11,7 +12,6 @@ import (
 	"testing"
 
 	bcerrors "github.com/ivanmartinez/boocat/boocat/errors"
-	"github.com/ivanmartinez/boocat/log"
 )
 
 // MockDB is a database mock for testing
@@ -365,7 +365,7 @@ func initializedBoocat(db database) *Boocat {
 func regExpValidator(regExpString string) Validate {
 	regExp, err := regexp.Compile(regExpString)
 	if err != nil {
-		log.Error.Fatal(err)
+		log.Fatal(err)
 	}
 	return func(_ context.Context, value interface{}) string {
 		stringValue := fmt.Sprintf("%v", value)

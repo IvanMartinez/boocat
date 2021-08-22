@@ -2,9 +2,14 @@ package errors
 
 // common errors
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
-type InternalServerError struct{}
+type UnexpectedError struct {
+	err error
+}
 
 var (
 	ErrFormatNotFound     = errors.New("format not found")
@@ -17,8 +22,16 @@ type ValidationFailedError struct {
 	Failed map[string]string
 }
 
-func (e InternalServerError) Error() string {
-	return "internal boocat error"
+func NewUnexpectedError(err error) UnexpectedError {
+	return UnexpectedError{err: err}
+}
+
+func (e UnexpectedError) Error() string {
+	return fmt.Sprintf("internal error: %v", e.err)
+}
+
+func (e UnexpectedError) Unwrap() error {
+	return e.err
 }
 
 func (e ValidationFailedError) Error() string {

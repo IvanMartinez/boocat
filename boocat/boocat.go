@@ -1,14 +1,13 @@
 package boocat
 
 // Implements the boocat API and logic
-// TODO Don't log errors, return them
 
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	bcerrors "github.com/ivanmartinez/boocat/boocat/errors"
-	"github.com/ivanmartinez/boocat/log"
 )
 
 // database client interface
@@ -50,8 +49,7 @@ func (bc *Boocat) Formats() map[string]Format {
 // GetRecord returns a record of a format by id
 func (bc *Boocat) GetRecord(ctx context.Context, formatName string, id string) (map[string]string, error) {
 	if bc.db == nil {
-		log.Error.Println("database not set")
-		return nil, bcerrors.InternalServerError{}
+		return nil, bcerrors.NewUnexpectedError(errors.New("database not set"))
 	}
 	record, err := bc.db.GetRecord(ctx, formatName, id)
 	switch {
@@ -62,16 +60,14 @@ func (bc *Boocat) GetRecord(ctx context.Context, formatName string, id string) (
 	case errors.Is(err, bcerrors.ErrRecordNotFound):
 		return nil, bcerrors.ErrRecordNotFound
 	default:
-		log.Error.Printf("getting record from database: %v\n", err)
-		return nil, bcerrors.InternalServerError{}
+		return nil, bcerrors.NewUnexpectedError(fmt.Errorf("getting record from database: %v\n", err))
 	}
 }
 
 // ListRecords returns a slice with all records of a format
 func (bc *Boocat) ListRecords(ctx context.Context, formatName string) ([]map[string]string, error) {
 	if bc.db == nil {
-		log.Error.Println("database not set")
-		return nil, bcerrors.InternalServerError{}
+		return nil, bcerrors.NewUnexpectedError(errors.New("database not set"))
 	}
 	records, err := bc.db.GetAllRecords(ctx, formatName)
 	switch {
@@ -80,16 +76,14 @@ func (bc *Boocat) ListRecords(ctx context.Context, formatName string) ([]map[str
 	case errors.Is(err, bcerrors.ErrFormatNotFound):
 		return nil, bcerrors.ErrFormatNotFound
 	default:
-		log.Error.Printf("getting records from database: %v\n", err)
-		return nil, bcerrors.InternalServerError{}
+		return nil, bcerrors.NewUnexpectedError(fmt.Errorf("getting records from database: %v\n", err))
 	}
 }
 
 // SearchRecords returns a slice of the records of a format whose searchable fields contain the search value
 func (bc *Boocat) SearchRecords(ctx context.Context, formatName string, search string) ([]map[string]string, error) {
 	if bc.db == nil {
-		log.Error.Println("database not set")
-		return nil, bcerrors.InternalServerError{}
+		return nil, bcerrors.NewUnexpectedError(errors.New("database not set"))
 	}
 	records, err := bc.db.SearchRecord(ctx, formatName, search)
 	switch {
@@ -98,16 +92,14 @@ func (bc *Boocat) SearchRecords(ctx context.Context, formatName string, search s
 	case errors.Is(err, bcerrors.ErrFormatNotFound):
 		return nil, bcerrors.ErrFormatNotFound
 	default:
-		log.Error.Printf("searching records from database: %v\n", err)
-		return nil, bcerrors.InternalServerError{}
+		return nil, bcerrors.NewUnexpectedError(fmt.Errorf("getting records from database: %v\n", err))
 	}
 }
 
 // AddRecord adds a record of a format
 func (bc *Boocat) AddRecord(ctx context.Context, formatName string, record map[string]string) (string, error) {
 	if bc.db == nil {
-		log.Error.Println("database not set")
-		return "", bcerrors.InternalServerError{}
+		return "", bcerrors.NewUnexpectedError(errors.New("database not set"))
 	}
 	format := bc.formats[formatName] // TODO: Check that the format exists
 	failed := format.Validate(ctx, record)
@@ -121,8 +113,7 @@ func (bc *Boocat) AddRecord(ctx context.Context, formatName string, record map[s
 	case errors.Is(err, bcerrors.ErrRecordHasID):
 		return "", bcerrors.ErrRecordHasID
 	case err != nil:
-		log.Error.Printf("adding record to database: %v\n", err)
-		return "", bcerrors.InternalServerError{}
+		return "", bcerrors.NewUnexpectedError(fmt.Errorf("adding record to database: %v\n", err))
 	}
 	return id, nil
 }
@@ -130,8 +121,7 @@ func (bc *Boocat) AddRecord(ctx context.Context, formatName string, record map[s
 // UpdateRecord updates a record of a format
 func (bc *Boocat) UpdateRecord(ctx context.Context, formatName string, record map[string]string) error {
 	if bc.db == nil {
-		log.Error.Println("database not set")
-		return bcerrors.InternalServerError{}
+		return bcerrors.NewUnexpectedError(errors.New("database not set"))
 	}
 	format := bc.formats[formatName] // TODO: Check that the format exists
 	failed := format.Validate(ctx, record)
@@ -147,7 +137,6 @@ func (bc *Boocat) UpdateRecord(ctx context.Context, formatName string, record ma
 	case errors.Is(err, bcerrors.ErrRecordDoesntHaveID):
 		return bcerrors.ErrRecordDoesntHaveID
 	default:
-		log.Error.Printf("adding record to database: %v\n", err)
-		return bcerrors.InternalServerError{}
+		return bcerrors.NewUnexpectedError(fmt.Errorf("updating record in database: %v\n", err))
 	}
 }

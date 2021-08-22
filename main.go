@@ -12,7 +12,6 @@ import (
 
 	"github.com/ivanmartinez/boocat/boocat"
 	"github.com/ivanmartinez/boocat/boocat/mongodb"
-	"github.com/ivanmartinez/boocat/log"
 	"github.com/ivanmartinez/boocat/webserver"
 )
 
@@ -29,12 +28,15 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		oscall := <-c
-		log.Info.Printf("received signal %v", oscall)
+		webserver.Info.Printf("received signal %v", oscall)
 		cancel()
 	}()
 
 	// Initialize database
-	db := mongodb.NewMongoDB(ctx, dbURI)
+	db, err := mongodb.NewMongoDB(ctx, dbURI)
+	if err != nil {
+		webserver.Error.Fatal(err)
+	}
 	// Set formats
 	var bc boocat.Boocat
 	bc.SetFormat("author", boocat.Format{
@@ -57,7 +59,10 @@ func main() {
 		Searchable: map[string]struct{}{"name": {}, "synopsis": {}},
 	})
 	// Make sure database collections match the defined formats
-	db.InitializeCollections(ctx, bc.Formats())
+	if err := db.InitializeCollections(ctx, bc.Formats()); err != nil {
+		webserver.Error.Fatal(err)
+	}
+
 	// Set database to use
 	bc.SetDatabase(db)
 	ws := webserver.Initialize(*url, &bc)
@@ -72,14 +77,16 @@ func main() {
 
 	// Shut services down
 	ws.Shutdown(ctxShutDown)
-	db.Disconnect(ctxShutDown)
+	if err := db.Disconnect(ctxShutDown); err != nil {
+		webserver.Error.Print(err)
+	}
 }
 
 // reqExpValidator returns a validator that uses the regular expression passed as argument
 func regExpValidator(regExpString string) boocat.Validate {
 	regExp, err := regexp.Compile(regExpString)
 	if err != nil {
-		log.Error.Fatal(err)
+		webserver.Error.Fatal(err)
 	}
 	return func(_ context.Context, value interface{}) string {
 		stringValue := fmt.Sprintf("%v", value)
