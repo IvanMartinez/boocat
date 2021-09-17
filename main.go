@@ -11,14 +11,14 @@ import (
 	"time"
 
 	"github.com/ivanmartinez/boocat/boocat"
-	"github.com/ivanmartinez/boocat/boocat/mongodb"
+	"github.com/ivanmartinez/boocat/boocat/sqlite"
 	"github.com/ivanmartinez/boocat/webserver"
 )
 
 func main() {
 	// Parse flags
 	url := flag.String("url", "localhost:80", "This boocat's base URL")
-	dbURI := flag.String("dburi", "mongodb://127.0.0.1:27017", "Database URI")
+	dbDataSource := flag.String("dbds", "boocat.sqlite", "Database source")
 	flag.Parse()
 
 	// Create channel for listening to OS signals and connect OS interrupts to
@@ -32,8 +32,8 @@ func main() {
 		cancel()
 	}()
 
-	// Initialize database
-	db, err := mongodb.NewMongoDB(ctx, dbURI)
+	// Open database
+	db, err := sqlite.Open(ctx, dbDataSource)
 	if err != nil {
 		webserver.Error.Fatal(err)
 	}
@@ -58,10 +58,6 @@ func main() {
 		},
 		Searchable: map[string]struct{}{"name": {}, "synopsis": {}},
 	})
-	// Make sure database collections match the defined formats
-	if err := db.InitializeCollections(ctx, bc.Formats()); err != nil {
-		webserver.Error.Fatal(err)
-	}
 
 	// Set database to use
 	bc.SetDatabase(db)
@@ -77,7 +73,7 @@ func main() {
 
 	// Shut services down
 	ws.Shutdown(ctxShutDown)
-	if err := db.Disconnect(ctxShutDown); err != nil {
+	if err := db.Close(); err != nil {
 		webserver.Error.Print(err)
 	}
 }

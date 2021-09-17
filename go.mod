@@ -2,4 +2,4 @@ module github.com/ivanmartinez/boocat
 
 go 1.16
 
-require go.mongodb.org/mongo-driver v1.4.3
+require github.com/mattn/go-sqlite3 v1.14.8

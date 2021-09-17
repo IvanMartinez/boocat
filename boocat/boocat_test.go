@@ -336,7 +336,7 @@ func initializedDatabase() (db *MockDB) {
 }
 
 // initializedBoocat returns a boocat API and logic initialized with the database
-func initializedBoocat(db database) *Boocat {
+func initializedBoocat(db Database) *Boocat {
 	var bc Boocat
 	bc.SetFormat("author", Format{
 		Name: "author",

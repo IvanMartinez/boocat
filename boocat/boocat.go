@@ -11,7 +11,7 @@ import (
 )
 
 // database client interface
-type database interface {
+type Database interface {
 	AddRecord(ctx context.Context, formatName string, record map[string]string) (string, error)
 	UpdateRecord(ctx context.Context, formatName string, record map[string]string) error
 	GetAllRecords(ctx context.Context, formatName string) ([]map[string]string, error)
@@ -23,11 +23,11 @@ type database interface {
 // Boocat contains the data for the boocat API and logic
 type Boocat struct {
 	formats map[string]Format
-	db      database
+	db      Database
 }
 
 // SetDatabase sets the database to be used
-func (bc *Boocat) SetDatabase(db database) *Boocat {
+func (bc *Boocat) SetDatabase(db Database) *Boocat {
 	bc.db = db
 	return bc
 }
